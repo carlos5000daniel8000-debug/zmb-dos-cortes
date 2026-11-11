@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171717">
+  <meta name="description" content="Agende seu corte na ZMB Dos Cortes. Escolha um horário de terça a sábado.">
+  <title>Agende seu corte | ZMB Dos Cortes</title>
+  <link rel="icon" href="assets/logo.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="ZMB Dos Cortes, início">
+      <img src="assets/logo.jpg" alt="" class="brand-logo">
+      <span class="brand-name">ZMB <span>Dos Cortes</span></span>
+    </a>
+    <nav class="header-links" aria-label="Navegação principal">
+      <a class="header-link" href="#precos">Preços</a>
+      <a class="header-link" href="#agendamento">Agendar horário <span aria-hidden="true">↘</span></a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> TERÇA A SÁBADO · 09H ÀS 19H</p>
+        <h1 id="hero-title">Seu estilo,<br><em>em boas mãos.</em></h1>
+        <p class="hero-text">Na ZMB Dos Cortes, cada detalhe importa. Atendimento com cuidado, respeito ao seu tempo e a confiança de sair satisfeito.</p>
+        <a class="primary-link" href="#agendamento">Escolher horário <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="hero-photo">
+        <img src="assets/logo.jpg" alt="Logo da barbearia ZMB Dos Cortes">
+        <span class="photo-caption">Cuidado nos detalhes.<br><strong>Respeito ao seu tempo.</strong></span>
+      </div>
+      <span class="hero-index" aria-hidden="true">01 / ZMB</span>
+    </section>
+
+    <section class="prices-section" id="precos" aria-labelledby="prices-title">
+      <div class="prices-heading">
+        <p class="eyebrow">SERVIÇOS DA BARBEARIA</p>
+        <h2 id="prices-title">Tabela de preços</h2>
+        <p>Escolha o serviço ideal para você.</p>
+      </div>
+      <div class="prices-card">
+        <table class="prices-table">
+          <caption class="sr-only">Serviços e preços da ZMB Dos Cortes</caption>
+          <tbody>
+            <tr><th scope="row">Corte</th><td>R$ 20,00</td></tr>
+            <tr><th scope="row">Corte infantil (3 a 5 anos)</th><td>R$ 25,00</td></tr>
+            <tr><th scope="row">Corte a domicílio</th><td>R$ 30,00</td></tr>
+            <tr><th scope="row">Corte + barba + sobrancelha</th><td>R$ 37,00</td></tr>
+            <tr><th scope="row">Corte + barba</th><td>R$ 30,00</td></tr>
+            <tr><th scope="row">Corte + sobrancelha</th><td>R$ 25,00</td></tr>
+            <tr><th scope="row">Corte + cavanhaque + sobrancelha</th><td>R$ 33,00</td></tr>
+            <tr><th scope="row">Corte + cavanhaque</th><td>R$ 27,00</td></tr>
+            <tr><th scope="row">Barba</th><td>R$ 15,00</td></tr>
+            <tr><th scope="row">Sobrancelha</th><td>R$ 7,00</td></tr>
+            <tr><th scope="row">Cavanhaque</th><td>R$ 10,00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="booking-section" id="agendamento" aria-labelledby="booking-title">
+      <div class="booking-intro">
+        <p class="eyebrow">AGENDA ONLINE</p>
+        <h2 id="booking-title">Reserve seu horário</h2>
+        <p>Os horários ocupados deixam de aparecer como disponíveis para os próximos clientes.</p>
+        <div class="service-card">
+          <span class="service-icon" aria-hidden="true">✂</span>
+          <span><strong>Corte</strong><small>30 min de atendimento · 5 min de intervalo</small></span>
+          <span class="service-duration">35 min</span>
+        </div>
+      </div>
+
+      <form class="booking-card" id="booking-form">
+        <div class="form-heading">
+          <span class="step-number">01</span>
+          <div><h3>Escolha o dia e o horário</h3><p>Atendimentos de terça a sábado</p></div>
+        </div>
+
+        <label for="appointment-date">Data do corte</label>
+        <input id="appointment-date" name="date" type="date" required>
+        <p class="field-hint">Atendimento das 09h às 12h e das 13h às 19h, com almoço das 12h às 13h. Último início: 18h15.</p>
+
+        <fieldset class="time-fieldset">
+          <legend>Horários disponíveis</legend>
+          <div class="time-slots" id="time-slots" aria-live="polite">
+            <p class="slot-placeholder">Selecione uma data para consultar as vagas.</p>
+          </div>
+        </fieldset>
+
+        <div class="form-divider"></div>
+        <div class="form-heading customer-heading">
+          <span class="step-number">02</span>
+          <div><h3>Seu serviço e seus dados</h3><p>Escolha um serviço da tabela e informe seus dados</p></div>
+        </div>
+
+        <label for="service-type">Serviço desejado</label>
+        <select id="service-type" name="service" required>
+          <option value="" selected disabled>Selecione um serviço</option>
+          <option value="corte">Corte — R$ 20,00</option>
+          <option value="corte-infantil">Corte infantil (3 a 5 anos) — R$ 25,00</option>
+          <option value="corte-domicilio">Corte a domicílio — R$ 30,00</option>
+          <option value="corte-barba-sobrancelha">Corte + barba + sobrancelha — R$ 37,00</option>
+          <option value="corte-barba">Corte + barba — R$ 30,00</option>
+          <option value="corte-sobrancelha">Corte + sobrancelha — R$ 25,00</option>
+          <option value="corte-cavanhaque-sobrancelha">Corte + cavanhaque + sobrancelha — R$ 33,00</option>
+          <option value="corte-cavanhaque">Corte + cavanhaque — R$ 27,00</option>
+          <option value="barba">Barba — R$ 15,00</option>
+          <option value="sobrancelha">Sobrancelha — R$ 7,00</option>
+          <option value="cavanhaque">Cavanhaque — R$ 10,00</option>
+        </select>
+        <label for="customer-name">Seu nome</label>
+        <input id="customer-name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="Como podemos te chamar?" required>
+        <label for="customer-phone">Seu WhatsApp</label>
+        <input id="customer-phone" name="phone" type="tel" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="(83) 99999-9999" required>
+        <button class="submit-button" id="submit-button" type="submit" disabled>
+          Confirmar agendamento <span aria-hidden="true">↗</span>
+        </button>
+        <p class="privacy-note">Seu telefone será usado pela barbearia para responder sobre este agendamento.</p>
+        <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="hours-strip" aria-label="Horários de atendimento">
+      <span class="eyebrow">SEU TEMPO IMPORTA</span>
+      <p>Terça a sábado <strong>09:00 — 12:00 · 13:00 — 19:00</strong></p>
+      <span class="closed-note">Almoço das 12h às 13h · Fechado aos domingos e segundas</span>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a class="brand footer-brand" href="#">
+      <img src="assets/logo.jpg" alt="" class="brand-logo">
+      <span class="brand-name">ZMB <span>Dos Cortes</span></span>
+    </a>
+    <p>Agendamento sujeito à confirmação da barbearia.</p>
+  </footer>
+</body>
+</html>

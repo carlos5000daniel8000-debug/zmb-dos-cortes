@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: zmb-dos-cortes
+    runtime: python
+    plan: free
+    buildCommand: python -m compileall -q server.py
+    startCommand: python server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: DATA_DIR
+        value: /tmp/zmb-agenda-data
+      - key: WHATSAPP_RECIPIENT
+        value: "5583988354958"
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_GRAPH_VERSION
+        sync: false
+      - key: WHATSAPP_TEMPLATE_NAME
+        sync: false
+      - key: WHATSAPP_TEMPLATE_LANGUAGE
+        value: pt_BR
