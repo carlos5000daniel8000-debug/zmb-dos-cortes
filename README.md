@@ -37,6 +37,6 @@ Sem servidor ou configuração da Cloud API, a página continua utilizável: o f
 
 O `render.yaml` configura o servidor Python no plano grátis. Crie um Blueprint no Render apontando para esta pasta/projeto. O sistema usa SQLite em armazenamento temporário nesse plano: agendamentos podem ser apagados em reinicializações ou novas publicações, então não há garantia de uma agenda compartilhada permanente. Para manter os dados, use um plano com disco persistente e configure `DATA_DIR` para o caminho de montagem do disco.
 
-Configure as variáveis secretas da integração antes de ativar os agendamentos pelo servidor. Sem elas, o site continua disponível, mas o envio de agendamento pela API fica desativado.
+O Blueprint não pede tokens durante a publicação. Para ativar os agendamentos pelo servidor, adicione as variáveis secretas da integração no painel do Render; sem elas, o site continua disponível, mas o envio pela API fica desativado.
 
 O banco guarda nome e telefone informados para o agendamento. Restrinja o acesso ao painel de hospedagem e remova os dados quando deixar de usar o serviço.
