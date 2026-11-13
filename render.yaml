@@ -10,3 +10,5 @@ services:
         value: /tmp/zmb-agenda-data
       - key: DATABASE_URL
         sync: false
+      - key: WHATSAPP_RECIPIENT
+        sync: false

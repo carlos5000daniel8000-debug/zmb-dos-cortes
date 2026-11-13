@@ -185,7 +185,12 @@ form.addEventListener("submit", async (event) => {
     document.querySelector("#customer-name").value = "";
     document.querySelector("#customer-phone").value = "";
     await loadSlots();
-    setStatus(result.message, "success");
+    if (result.whatsappUrl) {
+      setStatus("Agendamento confirmado. Toque em Enviar no WhatsApp para avisar a barbearia.", "success");
+      window.location.assign(result.whatsappUrl);
+      return;
+    }
+    setStatus(result.whatsappMessage || result.message, "success");
   } catch (error) {
     await loadSlots();
     setStatus(error.message || "Não foi possível enviar o agendamento. Tente novamente.", "error");

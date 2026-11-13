@@ -12,6 +12,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -47,6 +49,7 @@ public final class BookingServer {
     private static final Path DATABASE_PATH = DATA_DIR.resolve("appointments.sqlite3");
     private static final String DATABASE_URL = System.getenv("DATABASE_URL");
     private static final boolean USE_POSTGRES = DATABASE_URL != null && !DATABASE_URL.isBlank();
+    private static final String WHATSAPP_RECIPIENT = System.getenv("WHATSAPP_RECIPIENT");
     private static final List<String> ALLOWED_SLOTS = buildAllowedSlots();
     private static final Map<String, StaticFile> STATIC_FILES = Map.of(
         "/", new StaticFile("index.html", "text/html; charset=utf-8"),
@@ -345,7 +348,45 @@ public final class BookingServer {
         response.addProperty("date", selectedDate.toString());
         response.addProperty("time", selectedTime);
         response.addProperty("message", "Agendamento confirmado. O horário foi reservado.");
+        String whatsappUrl = buildWhatsAppUrl(name, serviceId, selectedDate, selectedTime);
+        if (whatsappUrl == null) {
+            response.addProperty(
+                "whatsappMessage",
+                "Agendamento confirmado, mas o WhatsApp da barbearia não está configurado."
+            );
+        } else {
+            response.addProperty("whatsappUrl", whatsappUrl);
+        }
         sendJson(exchange, 201, response);
+    }
+
+    private static String buildWhatsAppUrl(
+            String name,
+            String serviceId,
+            LocalDate selectedDate,
+            String selectedTime) {
+        if (WHATSAPP_RECIPIENT == null || WHATSAPP_RECIPIENT.isBlank()) {
+            return null;
+        }
+
+        String recipient = WHATSAPP_RECIPIENT.replaceAll("\\D", "");
+        if (recipient.startsWith("00")) {
+            recipient = recipient.substring(2);
+        }
+        if (recipient.length() == 10 || recipient.length() == 11) {
+            recipient = "55" + recipient;
+        }
+        if (!recipient.startsWith("55") || recipient.length() < 12 || recipient.length() > 13) {
+            return null;
+        }
+
+        String message = "Olá! Acabei de confirmar um agendamento na ZMB dos Cortes."
+            + "\nNome: " + name
+            + "\nServiço: " + SERVICES.get(serviceId)
+            + "\nData: " + selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+            + "\nHorário: " + selectedTime;
+        return "https://wa.me/" + recipient + "?text="
+            + URLEncoder.encode(message, StandardCharsets.UTF_8);
     }
 
     private static boolean reserveSlot(
