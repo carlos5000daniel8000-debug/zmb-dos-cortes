@@ -7,7 +7,7 @@ RUN mvn -B package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/zmb-dos-cortes-1.0.0.jar app.jar
-COPY index.html styles.css app.js ./
+COPY index.html styles.css app.js admin.html admin.css admin.js ./
 COPY assets ./assets
 ENV DATA_DIR=/tmp/zmb-agenda-data
 EXPOSE 8080

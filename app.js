@@ -131,9 +131,7 @@ async function loadSlots({ preserveSelection = false } = {}) {
 }
 
 dateInput.min = localDateString(new Date());
-const maxDate = new Date();
-maxDate.setDate(maxDate.getDate() + 90);
-dateInput.max = localDateString(maxDate);
+dateInput.max = "2030-12-31";
 dateInput.addEventListener("change", loadSlots);
 form.addEventListener("input", updateSubmitState);
 loadSlots();

@@ -19,6 +19,14 @@ Depois de uma reserva bem-sucedida, o site abre o WhatsApp da barbearia com uma 
 
 Por padrão, a execução local usa SQLite em `data/appointments.sqlite3`. Para usar PostgreSQL, configure `DATABASE_URL` com a URL de conexão PostgreSQL (`postgresql://...`) ou uma URL JDBC (`jdbc:postgresql://...`); o servidor criará/atualizará a tabela automaticamente. No Neon, copie a connection string e mantenha-a como variável secreta, sem incluí-la no código ou em arquivos versionados.
 
+## Administração
+
+Acesse `/admin` e entre com a senha definida na variável de ambiente `ADMIN_PASSWORD`. No Render, configure essa variável como segredo no serviço; não compartilhe a senha no chat nem a coloque no repositório. Sem a variável, o acesso administrativo fica desabilitado. Em execução local, defina `ADMIN_PASSWORD` antes de iniciar o servidor.
+
+O painel permite consultar agendamentos por período, exportar o relatório em CSV, marcar pagamentos recebidos e cancelar agendamentos individuais. A lista é filtrada pela data do atendimento; o total recebido considera somente pagamentos marcados como recebidos pela data do recebimento. Ao fechar uma data, os agendamentos existentes são cancelados, ficam preservados no histórico e não poderão ser substituídos naquela data.
+
+Os preços são guardados no agendamento, para que alterações futuras na tabela não mudem os relatórios antigos. A agenda pública aceita datas até 31/12/2030.
+
 ## Publicar no Render
 
 O `render.yaml` publica o servidor Java usando o `Dockerfile`. Crie ou atualize o Blueprint no Render apontando para esta pasta/projeto. Para manter os agendamentos entre reinicializações no plano grátis, configure a variável secreta `DATABASE_URL` no serviço com a URL de conexão do banco PostgreSQL externo (por exemplo, Neon). Sem essa variável, o servidor usa SQLite no diretório indicado por `DATA_DIR`, que no plano grátis do Render é temporário.
@@ -26,5 +34,7 @@ O `render.yaml` publica o servidor Java usando o `Dockerfile`. Crie ou atualize 
 Mudar para um banco PostgreSQL novo não copia automaticamente agendamentos existentes no SQLite. Antes de ativar o novo banco em produção, exporte/import os agendamentos atuais, se houver.
 
 No Render, configure `WHATSAPP_RECIPIENT` com o número da barbearia para abrir o WhatsApp após a confirmação. A integração usa um link `wa.me` com a mensagem pronta e não envia a mensagem automaticamente.
+
+Configure também `ADMIN_PASSWORD` como uma senha forte e exclusiva para habilitar `/admin`. O painel usa sessões temporárias e não armazena a senha no navegador.
 
 O banco guarda nome e telefone informados para o agendamento. Restrinja o acesso ao painel de hospedagem e remova os dados quando deixar de usar o serviço.

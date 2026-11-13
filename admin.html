@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171717">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Administração | ZMB Dos Cortes</title>
+  <link rel="icon" href="assets/logo.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="admin.css">
+  <script src="admin.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ZMB Dos Cortes, página inicial">
+      <img src="assets/logo.jpg" alt="" class="brand-logo">
+      <span class="brand-name">ZMB <span>Dos Cortes</span></span>
+    </a>
+    <nav class="header-links" aria-label="Navegação">
+      <a class="header-link" href="/">Voltar ao site <span aria-hidden="true">↗</span></a>
+      <button class="header-link logout-button" id="logout-button" type="button" hidden>Sair</button>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <section class="login-card" id="login-section" aria-labelledby="login-title">
+      <p class="eyebrow">ACESSO RESTRITO</p>
+      <h1 id="login-title">Área do barbeiro</h1>
+      <p class="intro">Entre com a senha de administração para consultar a agenda e os pagamentos.</p>
+      <form id="login-form">
+        <label for="admin-password">Senha de administração</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+        <button class="primary-button" type="submit">Entrar <span aria-hidden="true">↗</span></button>
+      </form>
+      <p class="status-message" id="login-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="dashboard" id="dashboard-section" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">AGENDA E PAGAMENTOS</p>
+          <h1>Administração</h1>
+        </div>
+        <button class="secondary-button" id="refresh-button" type="button">Atualizar relatório</button>
+      </div>
+
+      <section class="report-panel" aria-labelledby="report-title">
+        <div class="panel-heading">
+          <div>
+            <h2 id="report-title">Relatório de agendamentos</h2>
+            <p>O total considera pagamentos pela data em que foram recebidos; a lista mostra os atendimentos pela data agendada.</p>
+          </div>
+          <button class="secondary-button" id="export-button" type="button">Baixar CSV</button>
+        </div>
+        <form class="filter-form" id="report-form">
+          <div class="field">
+            <label for="report-from">De</label>
+            <input id="report-from" name="from" type="date" required>
+          </div>
+          <div class="field">
+            <label for="report-to">Até</label>
+            <input id="report-to" name="to" type="date" required>
+          </div>
+          <button class="primary-button" type="submit">Consultar</button>
+        </form>
+        <div class="summary-card">
+          <span>Valor recebido no período</span>
+          <strong id="received-total">R$ 0,00</strong>
+        </div>
+        <p class="status-message" id="report-status" role="status" aria-live="polite"></p>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Agendamentos no período selecionado</caption>
+            <thead>
+              <tr>
+                <th scope="col">Data e horário</th>
+                <th scope="col">Cliente</th>
+                <th scope="col">Serviço</th>
+                <th scope="col">Valor</th>
+                <th scope="col">Pagamento</th>
+                <th scope="col">Situação</th>
+                <th scope="col">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="appointment-rows"></tbody>
+          </table>
+        </div>
+        <p class="empty-state" id="empty-state" hidden>Nenhum agendamento encontrado nesse período.</p>
+      </section>
+
+      <div class="admin-columns">
+        <section class="panel" aria-labelledby="close-title">
+          <p class="eyebrow">IMPREVISTO</p>
+          <h2 id="close-title">Fechar um dia</h2>
+          <p class="panel-description">Ao fechar a data, os agendamentos existentes serão cancelados e os horários deixarão de ficar disponíveis.</p>
+          <form id="close-form">
+            <label for="close-date">Data</label>
+            <input id="close-date" name="date" type="date" max="2030-12-31" required>
+            <label for="close-reason">Motivo</label>
+            <input id="close-reason" name="reason" type="text" maxlength="160" placeholder="Ex.: imprevisto pessoal" required>
+            <button class="danger-button" type="submit">Fechar agenda nesta data</button>
+          </form>
+          <p class="status-message" id="close-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="panel" aria-labelledby="closures-title">
+          <p class="eyebrow">DATAS BLOQUEADAS</p>
+          <h2 id="closures-title">Agenda fechada</h2>
+          <ul class="closure-list" id="closure-list"></ul>
+          <p class="empty-state" id="closures-empty" hidden>Nenhuma data fechada nesse período.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
