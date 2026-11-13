@@ -15,7 +15,7 @@ Abra `http://localhost:8080`. A agenda fica em `data/appointments.sqlite3`. Para
 
 Ao confirmar um agendamento, o servidor grava a reserva no banco e o horário deixa de aparecer como disponível para os próximos clientes. As páginas abertas atualizam a disponibilidade automaticamente a cada 10 segundos e ao voltar para a aba. Se duas pessoas tentarem reservar o mesmo horário ao mesmo tempo, apenas a primeira confirmação será aceita.
 
-Depois de uma reserva bem-sucedida, o site abre o WhatsApp da barbearia com uma mensagem contendo o nome, serviço, data e horário. O cliente ainda precisa tocar em **Enviar** no WhatsApp; não é necessário ter WhatsApp Business. Configure `WHATSAPP_RECIPIENT` com o número da barbearia (com DDD e, de preferência, código do país `55`). Se o número estiver ausente ou inválido, o agendamento continuará confirmado e o site avisará que o WhatsApp não está configurado.
+Depois de uma reserva bem-sucedida, o site abre o WhatsApp da barbearia com uma mensagem contendo o nome, serviço, valor, data e horário. O cliente ainda precisa tocar em **Enviar** no WhatsApp; não é necessário ter WhatsApp Business. Configure `WHATSAPP_RECIPIENT` com o número da barbearia (com DDD e, de preferência, código do país `55`). Se o número estiver ausente ou inválido, o agendamento continuará confirmado e o site avisará que o WhatsApp não está configurado.
 
 Por padrão, a execução local usa SQLite em `data/appointments.sqlite3`. Para usar PostgreSQL, configure `DATABASE_URL` com a URL de conexão PostgreSQL (`postgresql://...`) ou uma URL JDBC (`jdbc:postgresql://...`); o servidor criará/atualizará a tabela automaticamente. No Neon, copie a connection string e mantenha-a como variável secreta, sem incluí-la no código ou em arquivos versionados.
 

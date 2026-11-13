@@ -58,18 +58,21 @@ public final class BookingServer {
         "/app.js", new StaticFile("app.js", "text/javascript; charset=utf-8"),
         "/assets/logo.jpg", new StaticFile("assets/logo.jpg", "image/jpeg")
     );
-    private static final Map<String, String> SERVICES = Map.ofEntries(
-        Map.entry("corte", "Corte"),
-        Map.entry("corte-infantil", "Corte infantil (3 a 5 anos)"),
-        Map.entry("corte-domicilio", "Corte a domicílio"),
-        Map.entry("corte-barba-sobrancelha", "Corte + barba + sobrancelha"),
-        Map.entry("corte-barba", "Corte + barba"),
-        Map.entry("corte-sobrancelha", "Corte + sobrancelha"),
-        Map.entry("corte-cavanhaque-sobrancelha", "Corte + cavanhaque + sobrancelha"),
-        Map.entry("corte-cavanhaque", "Corte + cavanhaque"),
-        Map.entry("barba", "Barba"),
-        Map.entry("sobrancelha", "Sobrancelha"),
-        Map.entry("cavanhaque", "Cavanhaque")
+    private static final Map<String, Service> SERVICES = Map.ofEntries(
+        Map.entry("corte", new Service("Corte", "R$ 20,00")),
+        Map.entry("corte-infantil", new Service("Corte infantil (3 a 5 anos)", "R$ 25,00")),
+        Map.entry("corte-domicilio", new Service("Corte a domicílio", "R$ 30,00")),
+        Map.entry("corte-barba-sobrancelha", new Service("Corte + barba + sobrancelha", "R$ 37,00")),
+        Map.entry("corte-barba", new Service("Corte + barba", "R$ 30,00")),
+        Map.entry("corte-sobrancelha", new Service("Corte + sobrancelha", "R$ 25,00")),
+        Map.entry(
+            "corte-cavanhaque-sobrancelha",
+            new Service("Corte + cavanhaque + sobrancelha", "R$ 33,00")
+        ),
+        Map.entry("corte-cavanhaque", new Service("Corte + cavanhaque", "R$ 27,00")),
+        Map.entry("barba", new Service("Barba", "R$ 15,00")),
+        Map.entry("sobrancelha", new Service("Sobrancelha", "R$ 7,00")),
+        Map.entry("cavanhaque", new Service("Cavanhaque", "R$ 10,00"))
     );
 
     private BookingServer() {
@@ -380,9 +383,11 @@ public final class BookingServer {
             return null;
         }
 
+        Service service = SERVICES.get(serviceId);
         String message = "Olá! Acabei de confirmar um agendamento na ZMB dos Cortes."
             + "\nNome: " + name
-            + "\nServiço: " + SERVICES.get(serviceId)
+            + "\nServiço: " + service.name()
+            + "\nValor: " + service.price()
             + "\nData: " + selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
             + "\nHorário: " + selectedTime;
         return "https://wa.me/" + recipient + "?text="
@@ -602,6 +607,9 @@ public final class BookingServer {
             || exception.getErrorCode() == 19
             || (exception.getMessage() != null
                 && exception.getMessage().contains("UNIQUE constraint failed"));
+    }
+
+    private record Service(String name, String price) {
     }
 
     private record StaticFile(String path, String contentType) {
