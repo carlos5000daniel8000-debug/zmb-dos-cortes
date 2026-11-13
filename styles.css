@@ -146,7 +146,9 @@ h1 em { color: var(--accent); font-weight: 500; }
 .footer-brand .brand-logo { width: 35px; height: 35px; }
 .footer-brand .brand-name { font-size: 13px; }
 .footer-brand .brand-name span { font-size: 8px; }
-.footer > p { margin: 0; color: var(--muted); font-size: 10px; text-align: right; }
+.footer-details { display: grid; justify-items: end; gap: 7px; }
+.footer-details > p { max-width: 290px; margin: 0; color: var(--muted); font-size: 10px; text-align: right; }
+.footer-admin-link { color: var(--green); font-size: 10px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
   .hero { grid-template-columns: 1fr .65fr; min-height: 375px; padding: 52px 7vw; }
@@ -183,5 +185,6 @@ h1 em { color: var(--accent); font-weight: 500; }
   .hours-strip p strong { margin-left: 8px; font-size: 10px; }
   .closed-note { width: 100%; }
   .footer { align-items: flex-start; }
-  .footer > p { max-width: 155px; line-height: 1.5; }
+  .footer-details { max-width: 175px; }
+  .footer-details > p { line-height: 1.5; }
 }
