@@ -6,11 +6,10 @@ const form = document.querySelector("#booking-form");
 const submitButton = document.querySelector("#submit-button");
 const statusMessage = document.querySelector("#form-status");
 const serviceSelect = document.querySelector("#service-type");
-const WHATSAPP_NUMBER = "5583988354958";
+const SLOT_REFRESH_INTERVAL_MS = 10000;
 let selectedTime = "";
-let whatsappReady = false;
-let serviceChecked = false;
-let selectedDate = "";
+let slotsRequestId = 0;
+let bookingInProgress = false;
 
 const dailyTimes = [];
 for (const [start, end] of [[9 * 60, 11 * 60 + 20], [13 * 60, 18 * 60 + 15]]) {
@@ -32,7 +31,7 @@ function setStatus(message, type) {
 }
 
 function updateSubmitState() {
-  submitButton.disabled = !serviceChecked || !selectedTime || !form.checkValidity();
+  submitButton.disabled = bookingInProgress || !selectedTime || !form.checkValidity();
 }
 
 async function readApiResponse(response, fallbackMessage) {
@@ -46,29 +45,31 @@ async function readApiResponse(response, fallbackMessage) {
   return result;
 }
 
-function renderSlots(slots, availabilityVerified = true) {
-  selectedTime = "";
+function renderSlots(slots, preserveSelection = false) {
+  const previousSelection = preserveSelection ? selectedTime : "";
+  const availableSlots = slots.filter((slot) => slot.available);
+  selectedTime = availableSlots.some((slot) => slot.time === previousSelection) ? previousSelection : "";
   slotsContainer.replaceChildren();
 
-  if (!slots.length) {
+  if (!availableSlots.length) {
     const message = document.createElement("p");
     message.className = "slot-placeholder";
     message.textContent = "Não há horários disponíveis nesta data.";
     slotsContainer.append(message);
+    if (previousSelection) {
+      setStatus("Esse horário acabou de ser reservado. Escolha outro horário.", "error");
+    }
     updateSubmitState();
     return;
   }
 
-  for (const slot of slots) {
+  for (const slot of availableSlots) {
     const button = document.createElement("button");
     button.className = "slot-button";
     button.type = "button";
     button.textContent = slot.time;
-    button.disabled = availabilityVerified && !slot.available;
-    button.setAttribute("aria-pressed", "false");
-    button.setAttribute("aria-label", availabilityVerified
-      ? `${slot.time}, ${slot.available ? "disponível" : "ocupado"}`
-      : `${slot.time}, disponibilidade ainda não consultada`);
+    button.setAttribute("aria-pressed", String(slot.time === selectedTime));
+    button.setAttribute("aria-label", `${slot.time}, disponível`);
     button.addEventListener("click", () => {
       selectedTime = slot.time;
       for (const other of slotsContainer.querySelectorAll(".slot-button")) {
@@ -80,58 +81,53 @@ function renderSlots(slots, availabilityVerified = true) {
     slotsContainer.append(button);
   }
 
-  if (!availabilityVerified) {
-    const message = document.createElement("p");
-    message.className = "slot-placeholder";
-    message.textContent = "Horários sugeridos: a agenda online não está conectada e a vaga precisa ser confirmada pela barbearia.";
-    slotsContainer.append(message);
+  if (previousSelection && !selectedTime) {
+    setStatus("Esse horário acabou de ser reservado. Escolha outro horário.", "error");
   }
   updateSubmitState();
 }
 
-async function loadSlots() {
-  selectedTime = "";
-  slotsContainer.replaceChildren();
-  setStatus("", "");
-  if (!dateInput.value) {
-    selectedDate = "";
-    renderSlots(dailyTimes.map((slot) => ({ time: slot, available: false })), false);
-    updateSubmitState();
+async function loadSlots({ preserveSelection = false } = {}) {
+  const requestId = ++slotsRequestId;
+  const requestedDate = dateInput.value;
+  if (!preserveSelection) {
+    selectedTime = "";
+    setStatus("", "");
+  }
+  if (!requestedDate) {
+    slotsContainer.replaceChildren();
+    renderSlots([]);
+    const message = document.createElement("p");
+    message.className = "slot-placeholder";
+    message.textContent = "Selecione uma data para consultar os horários disponíveis.";
+    slotsContainer.append(message);
     return;
   }
 
-  selectedDate = dateInput.value;
-  renderSlots(dailyTimes.map((slot) => ({ time: slot, available: true })), false);
-  const loading = document.createElement("p");
-  loading.className = "slot-placeholder slot-loading";
-  loading.textContent = "Atualizando disponibilidade...";
-  slotsContainer.append(loading);
+  if (!preserveSelection) {
+    slotsContainer.replaceChildren();
+    const loading = document.createElement("p");
+    loading.className = "slot-placeholder slot-loading";
+    loading.textContent = "Atualizando disponibilidade...";
+    slotsContainer.append(loading);
+  }
 
   try {
-    const response = await fetch(`/api/slots?date=${encodeURIComponent(dateInput.value)}`);
+    const response = await fetch(`/api/slots?date=${encodeURIComponent(requestedDate)}`);
     const result = await readApiResponse(response, "Não foi possível consultar a agenda.");
-    if (dateInput.value !== selectedDate) return;
-    renderSlots(result.slots);
+    if (requestId !== slotsRequestId || dateInput.value !== requestedDate) return;
+    renderSlots(result.slots, preserveSelection);
   } catch {
-    if (dateInput.value !== selectedDate) return;
-    const message = slotsContainer.querySelector(".slot-loading");
-    if (message) message.textContent = "Agenda online indisponível. Escolha um horário sugerido e confirme a vaga pelo WhatsApp.";
+    if (requestId !== slotsRequestId || dateInput.value !== requestedDate) return;
+    if (preserveSelection) {
+      setStatus("Não foi possível atualizar a disponibilidade. Tente novamente antes de reservar.", "error");
+      return;
+    }
+    slotsContainer.replaceChildren();
+    renderSlots([]);
+    const message = slotsContainer.querySelector(".slot-placeholder");
+    if (message) message.textContent = "Não foi possível consultar a agenda. Tente novamente antes de reservar.";
   }
-}
-
-async function checkServiceStatus() {
-  try {
-    const response = await fetch("/api/status");
-    const result = await readApiResponse(response, "Não foi possível verificar o serviço.");
-    whatsappReady = result.bookingEnabled === true;
-  } catch {
-    whatsappReady = false;
-  }
-  serviceChecked = true;
-  if (!whatsappReady) {
-    setStatus("Ao continuar, o WhatsApp abrirá com sua mensagem pronta. Toque em Enviar e aguarde a barbearia confirmar a vaga.", "");
-  }
-  updateSubmitState();
 }
 
 dateInput.min = localDateString(new Date());
@@ -141,61 +137,47 @@ dateInput.max = localDateString(maxDate);
 dateInput.addEventListener("change", loadSlots);
 form.addEventListener("input", updateSubmitState);
 loadSlots();
+setInterval(() => {
+  if (!document.hidden && dateInput.value && !bookingInProgress) {
+    loadSlots({ preserveSelection: true });
+  }
+}, SLOT_REFRESH_INTERVAL_MS);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && dateInput.value && !bookingInProgress) {
+    loadSlots({ preserveSelection: true });
+  }
+});
+window.addEventListener("focus", () => {
+  if (dateInput.value && !bookingInProgress) {
+    loadSlots({ preserveSelection: true });
+  }
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!selectedTime || !form.reportValidity()) return;
 
-  if (!whatsappReady) {
-    const name = document.querySelector("#customer-name").value.trim();
-    const phone = document.querySelector("#customer-phone").value.trim();
-    const service = serviceSelect.selectedOptions[0].textContent;
-    const date = dateInput.value.split("-").reverse().join("/");
-    const message = [
-      "Olá! Quero confirmar um agendamento na ZMB Dos Cortes.",
-      "",
-      `Serviço: ${service}`,
-      `Nome: ${name}`,
-      `Meu WhatsApp: ${phone}`,
-      `Data: ${date}`,
-      `Horário: ${selectedTime}`,
-      "",
-      "Por favor, confirme a disponibilidade deste horário."
-    ].join("\n");
-    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-    const link = document.createElement("a");
-    link.href = whatsappUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.style.position = "fixed";
-    link.style.left = "-10000px";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setStatus("Sua solicitação está pronta. Se o WhatsApp não abriu, use este link:", "success");
-    const whatsappLink = document.createElement("a");
-    whatsappLink.href = whatsappUrl;
-    whatsappLink.target = "_blank";
-    whatsappLink.rel = "noopener noreferrer";
-    whatsappLink.textContent = "Abrir WhatsApp e enviar pedido";
-    statusMessage.append(" ", whatsappLink, " — depois, aguarde a confirmação da barbearia.");
-    return;
-  }
-
+  bookingInProgress = true;
   submitButton.disabled = true;
   submitButton.textContent = "Confirmando agendamento...";
   setStatus("", "");
 
   try {
+    const booking = {
+      date: dateInput.value,
+      time: selectedTime,
+      name: document.querySelector("#customer-name").value,
+      phone: document.querySelector("#customer-phone").value
+    };
     const response = await fetch("/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        date: dateInput.value,
-        time: selectedTime,
+        date: booking.date,
+        time: booking.time,
         service: serviceSelect.value,
-        name: document.querySelector("#customer-name").value,
-        phone: document.querySelector("#customer-phone").value
+        name: booking.name,
+        phone: booking.phone
       })
     });
     const result = await readApiResponse(response, "Não foi possível confirmar este horário.");
@@ -203,14 +185,13 @@ form.addEventListener("submit", async (event) => {
     document.querySelector("#customer-name").value = "";
     document.querySelector("#customer-phone").value = "";
     await loadSlots();
-    setStatus("Agendamento confirmado e relatório do dia enviado para a barbearia pelo WhatsApp.", "success");
+    setStatus(result.message, "success");
   } catch (error) {
     await loadSlots();
     setStatus(error.message || "Não foi possível enviar o agendamento. Tente novamente.", "error");
   } finally {
+    bookingInProgress = false;
     submitButton.innerHTML = 'Confirmar agendamento <span aria-hidden="true">↗</span>';
     updateSubmitState();
   }
 });
-
-checkServiceStatus();
