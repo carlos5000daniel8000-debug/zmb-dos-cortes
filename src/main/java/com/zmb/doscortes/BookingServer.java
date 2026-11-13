@@ -11,6 +11,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -43,6 +45,8 @@ public final class BookingServer {
         System.getenv().getOrDefault("DATA_DIR", BASE_DIR.resolve("data").toString())
     ).toAbsolutePath().normalize();
     private static final Path DATABASE_PATH = DATA_DIR.resolve("appointments.sqlite3");
+    private static final String DATABASE_URL = System.getenv("DATABASE_URL");
+    private static final boolean USE_POSTGRES = DATABASE_URL != null && !DATABASE_URL.isBlank();
     private static final List<String> ALLOWED_SLOTS = buildAllowedSlots();
     private static final Map<String, StaticFile> STATIC_FILES = Map.of(
         "/", new StaticFile("index.html", "text/html; charset=utf-8"),
@@ -70,9 +74,9 @@ public final class BookingServer {
 
     public static void main(String[] args) throws IOException, SQLException {
         try {
-            Class.forName("org.sqlite.JDBC");
+            Class.forName(USE_POSTGRES ? "org.postgresql.Driver" : "org.sqlite.JDBC");
         } catch (ClassNotFoundException exception) {
-            throw new IllegalStateException("SQLite JDBC driver was not found.", exception);
+            throw new IllegalStateException("The configured database JDBC driver was not found.", exception);
         }
         initializeDatabase();
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
@@ -91,12 +95,17 @@ public final class BookingServer {
     }
 
     private static void initializeDatabase() throws IOException, SQLException {
-        Files.createDirectories(DATA_DIR);
+        if (!USE_POSTGRES) {
+            Files.createDirectories(DATA_DIR);
+        }
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement()) {
+            String idColumn = USE_POSTGRES
+                ? "BIGSERIAL PRIMARY KEY"
+                : "INTEGER PRIMARY KEY AUTOINCREMENT";
             statement.execute("""
                 CREATE TABLE IF NOT EXISTS appointments (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id %s,
                     customer_name TEXT NOT NULL,
                     customer_phone TEXT NOT NULL,
                     service_id TEXT NOT NULL DEFAULT 'corte',
@@ -105,30 +114,86 @@ public final class BookingServer {
                     created_at TEXT NOT NULL,
                     UNIQUE (appointment_date, appointment_time)
                 )
-                """);
+                """.formatted(idColumn));
 
-            boolean hasServiceId = false;
-            try (ResultSet columns = statement.executeQuery("PRAGMA table_info(appointments)")) {
-                while (columns.next()) {
-                    if ("service_id".equals(columns.getString("name"))) {
-                        hasServiceId = true;
-                        break;
+            if (USE_POSTGRES) {
+                statement.execute(
+                    "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS "
+                        + "service_id TEXT NOT NULL DEFAULT 'corte'"
+                );
+            } else {
+                boolean hasServiceId = false;
+                try (ResultSet columns = statement.executeQuery("PRAGMA table_info(appointments)")) {
+                    while (columns.next()) {
+                        if ("service_id".equals(columns.getString("name"))) {
+                            hasServiceId = true;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!hasServiceId) {
-                statement.execute(
-                    "ALTER TABLE appointments ADD COLUMN service_id TEXT NOT NULL DEFAULT 'corte'"
-                );
+                if (!hasServiceId) {
+                    statement.execute(
+                        "ALTER TABLE appointments ADD COLUMN service_id TEXT NOT NULL DEFAULT 'corte'"
+                    );
+                }
             }
         }
     }
 
     private static Connection openConnection() throws SQLException {
+        if (USE_POSTGRES) {
+            return openPostgresConnection();
+        }
         SQLiteConfig config = new SQLiteConfig();
         config.setBusyTimeout(10_000);
         config.setTransactionMode(SQLiteConfig.TransactionMode.IMMEDIATE);
         return DriverManager.getConnection("jdbc:sqlite:" + DATABASE_PATH, config.toProperties());
+    }
+
+    private static Connection openPostgresConnection() throws SQLException {
+        String databaseUrl = DATABASE_URL.trim();
+        if (databaseUrl.startsWith("jdbc:postgresql://")) {
+            return DriverManager.getConnection(databaseUrl);
+        }
+        if (!databaseUrl.startsWith("postgresql://")
+                && !databaseUrl.startsWith("postgres://")) {
+            throw new IllegalStateException(
+                "DATABASE_URL must use a PostgreSQL URL starting with "
+                    + "postgresql://, postgres://, or jdbc:postgresql://."
+            );
+        }
+
+        URI uri;
+        try {
+            uri = URI.create(databaseUrl);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("DATABASE_URL is not a valid PostgreSQL URL.", exception);
+        }
+        String userInfo = uri.getRawUserInfo();
+        int separator = userInfo == null ? -1 : userInfo.indexOf(':');
+        String authority = uri.getRawAuthority();
+        int at = authority == null ? -1 : authority.lastIndexOf('@');
+        if (separator <= 0 || at < 0 || uri.getRawPath() == null || uri.getRawPath().isEmpty()) {
+            throw new IllegalStateException(
+                "DATABASE_URL must include a PostgreSQL user, password, host, and database."
+            );
+        }
+
+        String jdbcUrl = "jdbc:postgresql://" + authority.substring(at + 1) + uri.getRawPath();
+        if (uri.getRawQuery() != null) {
+            jdbcUrl += "?" + uri.getRawQuery();
+        }
+        Properties credentials = new Properties();
+        credentials.setProperty("user", decodeUrlCredential(userInfo.substring(0, separator)));
+        credentials.setProperty(
+            "password",
+            decodeUrlCredential(userInfo.substring(separator + 1))
+        );
+        return DriverManager.getConnection(jdbcUrl, credentials);
+    }
+
+    private static String decodeUrlCredential(String value) {
+        return URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 
     private static void handleRequest(HttpExchange exchange) throws IOException {
@@ -289,9 +354,14 @@ public final class BookingServer {
             String serviceId,
             LocalDate selectedDate,
             String selectedTime) throws SQLException {
-        try (Connection connection = openConnection();
-             Statement transaction = connection.createStatement()) {
-            transaction.execute("BEGIN IMMEDIATE");
+        try (Connection connection = openConnection()) {
+            if (USE_POSTGRES) {
+                connection.setAutoCommit(false);
+            } else {
+                try (Statement transaction = connection.createStatement()) {
+                    transaction.execute("BEGIN IMMEDIATE");
+                }
+            }
             try {
                 try (PreparedStatement query = connection.prepareStatement("""
                         SELECT 1 FROM appointments
@@ -302,7 +372,7 @@ public final class BookingServer {
                     query.setString(2, selectedTime);
                     try (ResultSet result = query.executeQuery()) {
                         if (result.next()) {
-                            transaction.execute("ROLLBACK");
+                            rollbackTransaction(connection);
                             return false;
                         }
                     }
@@ -321,15 +391,35 @@ public final class BookingServer {
                     insert.setString(6, LocalDateTime.now(LOCAL_ZONE).toString());
                     insert.executeUpdate();
                 }
-                transaction.execute("COMMIT");
+                commitTransaction(connection);
                 return true;
             } catch (SQLException | RuntimeException exception) {
                 try {
-                    transaction.execute("ROLLBACK");
+                    rollbackTransaction(connection);
                 } catch (SQLException rollbackException) {
                     exception.addSuppressed(rollbackException);
                 }
                 throw exception;
+            }
+        }
+    }
+
+    private static void commitTransaction(Connection connection) throws SQLException {
+        if (USE_POSTGRES) {
+            connection.commit();
+        } else {
+            try (Statement transaction = connection.createStatement()) {
+                transaction.execute("COMMIT");
+            }
+        }
+    }
+
+    private static void rollbackTransaction(Connection connection) throws SQLException {
+        if (USE_POSTGRES) {
+            connection.rollback();
+        } else {
+            try (Statement transaction = connection.createStatement()) {
+                transaction.execute("ROLLBACK");
             }
         }
     }
@@ -467,7 +557,8 @@ public final class BookingServer {
     }
 
     private static boolean isConstraintViolation(SQLException exception) {
-        return exception.getErrorCode() == 19
+        return "23505".equals(exception.getSQLState())
+            || exception.getErrorCode() == 19
             || (exception.getMessage() != null
                 && exception.getMessage().contains("UNIQUE constraint failed"));
     }

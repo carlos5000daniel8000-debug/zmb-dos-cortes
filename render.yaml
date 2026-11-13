@@ -8,3 +8,5 @@ services:
     envVars:
       - key: DATA_DIR
         value: /tmp/zmb-agenda-data
+      - key: DATABASE_URL
+        sync: false
