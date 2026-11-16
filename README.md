@@ -31,7 +31,7 @@ Por padrão, a execução local usa SQLite em `data/appointments.sqlite3`. Para 
 
 Acesse `/admin` e entre com a senha definida na variável de ambiente `ADMIN_PASSWORD`. No Render, configure essa variável como segredo no serviço; não compartilhe a senha no chat nem a coloque no repositório. Sem a variável, o acesso administrativo fica desabilitado. Em execução local, defina `ADMIN_PASSWORD` antes de iniciar o servidor.
 
-O painel permite consultar agendamentos por período, exportar o relatório em CSV, marcar pagamentos recebidos e cancelar agendamentos individuais. A lista é filtrada pela data do atendimento; o total recebido considera somente pagamentos marcados como recebidos pela data do recebimento. Ao fechar uma data, os agendamentos existentes são cancelados, ficam preservados no histórico e não poderão ser substituídos naquela data.
+O painel permite consultar agendamentos por período, exportar o relatório em CSV, marcar pagamentos recebidos e cancelar agendamentos individuais. A lista é filtrada pela data do atendimento; o total recebido considera somente pagamentos de agendamentos ativos marcados como recebidos pela data do recebimento. Agendamentos cancelados não entram no total, mesmo se tiverem sido marcados como pagos, mas permanecem no histórico. Ao fechar uma data, os agendamentos existentes são cancelados, ficam preservados no histórico e não poderão ser substituídos naquela data.
 
 Os preços são guardados no agendamento, para que alterações futuras na tabela não mudem os relatórios antigos. A agenda pública aceita datas até 31/12/2030.
 

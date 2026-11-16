@@ -647,17 +647,11 @@ public final class BookingServer {
                     SELECT service_price_cents
                     FROM appointments
                     WHERE is_paid = TRUE AND paid_at >= ? AND paid_at < ?
-                    UNION ALL
-                    SELECT service_price_cents
-                    FROM cancelled_appointments
-                    WHERE is_paid = TRUE AND paid_at >= ? AND paid_at < ?
                     """)) {
                 String fromTime = from + "T00:00:00";
                 String untilTime = to.plusDays(1) + "T00:00:00";
                 queryPayments.setString(1, fromTime);
                 queryPayments.setString(2, untilTime);
-                queryPayments.setString(3, fromTime);
-                queryPayments.setString(4, untilTime);
                 try (ResultSet result = queryPayments.executeQuery()) {
                     while (result.next()) {
                         receivedCents += result.getLong("service_price_cents");
