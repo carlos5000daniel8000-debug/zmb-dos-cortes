@@ -99,12 +99,13 @@ function renderAppointments(appointments) {
     const paymentBadge = document.createElement("span");
     paymentBadge.className = `badge${appointment.paid ? "" : " unpaid"}`;
     paymentBadge.textContent = appointment.paid ? "Pago" : "Pendente";
+    const paymentMethod = document.createElement("small");
+    paymentMethod.textContent = appointment.paymentMethod;
+    paymentCell.append(paymentBadge, paymentMethod);
     if (appointment.paidAt) {
       const paidDate = document.createElement("small");
       paidDate.textContent = `Recebido em ${new Date(appointment.paidAt).toLocaleString("pt-BR")}`;
-      paymentCell.append(paymentBadge, paidDate);
-    } else {
-      paymentCell.append(paymentBadge);
+      paymentCell.append(paidDate);
     }
     row.append(paymentCell);
 
@@ -224,7 +225,7 @@ function csvCell(value) {
 function downloadReport() {
   if (!currentReport) return;
   const rows = [
-    ["Data", "Horário", "Cliente", "WhatsApp", "Serviço", "Valor", "Pagamento", "Recebido em", "Situação", "Motivo do cancelamento"],
+    ["Data", "Horário", "Cliente", "WhatsApp", "Serviço", "Valor", "Forma de pagamento", "Pagamento", "Recebido em", "Situação", "Motivo do cancelamento"],
     ...currentReport.appointments.map((appointment) => [
       appointment.date,
       appointment.time,
@@ -232,6 +233,7 @@ function downloadReport() {
       appointment.phone,
       appointment.service,
       moneyLabel(appointment.priceCents),
+      appointment.paymentMethod,
       appointment.paid ? "Pago" : "Pendente",
       appointment.paidAt || "",
       appointment.cancelled ? "Cancelado" : "Ativo",

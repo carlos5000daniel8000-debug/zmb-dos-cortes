@@ -13,9 +13,17 @@ java -jar target/zmb-dos-cortes-1.0.0.jar
 
 Abra `http://localhost:8080`. A agenda fica em `data/appointments.sqlite3`. Para usar outra localização para os dados, configure `DATA_DIR`.
 
+Para habilitar o Pix localmente no PowerShell, defina `PIX_KEY` e `WHATSAPP_RECIPIENT` antes de iniciar o servidor:
+
+```powershell
+$env:PIX_KEY = "sua-chave-pix"
+$env:WHATSAPP_RECIPIENT = "5511999999999"
+java -jar target/zmb-dos-cortes-1.0.0.jar
+```
+
 Ao confirmar um agendamento, o servidor grava a reserva no banco e o horário deixa de aparecer como disponível para os próximos clientes. As páginas abertas atualizam a disponibilidade automaticamente a cada 10 segundos e ao voltar para a aba. Se duas pessoas tentarem reservar o mesmo horário ao mesmo tempo, apenas a primeira confirmação será aceita.
 
-Depois de uma reserva bem-sucedida, o site abre o WhatsApp da barbearia com uma mensagem contendo o nome, serviço, valor, data e horário. O cliente ainda precisa tocar em **Enviar** no WhatsApp; não é necessário ter WhatsApp Business. Configure `WHATSAPP_RECIPIENT` com o número da barbearia (com DDD e, de preferência, código do país `55`). Se o número estiver ausente ou inválido, o agendamento continuará confirmado e o site avisará que o WhatsApp não está configurado.
+No agendamento, o cliente pode pagar antecipadamente por Pix ou escolher débito, crédito ou espécie para pagar na barbearia. O Pix só fica disponível quando `PIX_KEY` e `WHATSAPP_RECIPIENT` estão configurados. Para Pix, o cliente precisa selecionar um comprovante em JPG, PNG ou PDF (até 10 MB) e, após reservar o horário, compartilhá-lo pelo WhatsApp. Em dispositivos compatíveis, o site abre o compartilhamento do arquivo; nos demais, o cliente anexa o arquivo manualmente na conversa. O cliente ainda precisa confirmar o envio no WhatsApp. Configure `WHATSAPP_RECIPIENT` com o número da barbearia (com DDD e, de preferência, código do país `55`) e `PIX_KEY` com a chave Pix. O comprovante não é enviado nem armazenado pelo site; a confirmação do pagamento continua sendo feita pelo barbeiro no painel administrativo.
 
 Por padrão, a execução local usa SQLite em `data/appointments.sqlite3`. Para usar PostgreSQL, configure `DATABASE_URL` com a URL de conexão PostgreSQL (`postgresql://...`) ou uma URL JDBC (`jdbc:postgresql://...`); o servidor criará/atualizará a tabela automaticamente. No Neon, copie a connection string e mantenha-a como variável secreta, sem incluí-la no código ou em arquivos versionados.
 
@@ -33,7 +41,7 @@ O `render.yaml` publica o servidor Java usando o `Dockerfile`. Crie ou atualize 
 
 Mudar para um banco PostgreSQL novo não copia automaticamente agendamentos existentes no SQLite. Antes de ativar o novo banco em produção, exporte/import os agendamentos atuais, se houver.
 
-No Render, configure `WHATSAPP_RECIPIENT` com o número da barbearia para abrir o WhatsApp após a confirmação. A integração usa um link `wa.me` com a mensagem pronta e não envia a mensagem automaticamente.
+No Render, configure `WHATSAPP_RECIPIENT` com o número da barbearia e `PIX_KEY` com a chave Pix. O Pix é desabilitado se qualquer uma dessas variáveis estiver ausente ou inválida. A integração usa compartilhamento de arquivo em dispositivos compatíveis ou um link `wa.me`; ela não envia mensagens automaticamente.
 
 Configure também `ADMIN_PASSWORD` como uma senha forte e exclusiva para habilitar `/admin`. O painel usa sessões temporárias e não armazena a senha no navegador.
 

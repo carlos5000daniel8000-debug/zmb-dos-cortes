@@ -58,6 +58,7 @@ public final class BookingServer {
     private static final String DATABASE_URL = System.getenv("DATABASE_URL");
     private static final boolean USE_POSTGRES = DATABASE_URL != null && !DATABASE_URL.isBlank();
     private static final String WHATSAPP_RECIPIENT = System.getenv("WHATSAPP_RECIPIENT");
+    private static final String PIX_KEY = System.getenv("PIX_KEY");
     private static final String ADMIN_PASSWORD = System.getenv("ADMIN_PASSWORD");
     private static final String ADMIN_COOKIE_NAME = "zmb_admin_session";
     private static final Duration ADMIN_SESSION_DURATION = Duration.ofHours(8);
@@ -132,6 +133,7 @@ public final class BookingServer {
                     customer_name TEXT NOT NULL,
                     customer_phone TEXT NOT NULL,
                     service_id TEXT NOT NULL DEFAULT 'corte',
+                    payment_method TEXT NOT NULL DEFAULT 'cash',
                     appointment_date TEXT NOT NULL,
                     appointment_time TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -155,23 +157,36 @@ public final class BookingServer {
                 statement.execute(
                     "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS paid_at TEXT"
                 );
+                statement.execute(
+                    "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS "
+                        + "payment_method TEXT NOT NULL DEFAULT 'cash'"
+                );
             } else {
                 ensureSQLiteColumn(
                     statement,
+                    "appointments",
                     "service_id",
                     "TEXT NOT NULL DEFAULT 'corte'"
                 );
                 ensureSQLiteColumn(
                     statement,
+                    "appointments",
                     "service_price_cents",
                     "BIGINT NOT NULL DEFAULT 0"
                 );
                 ensureSQLiteColumn(
                     statement,
+                    "appointments",
                     "is_paid",
                     "BOOLEAN NOT NULL DEFAULT FALSE"
                 );
-                ensureSQLiteColumn(statement, "paid_at", "TEXT");
+                ensureSQLiteColumn(statement, "appointments", "paid_at", "TEXT");
+                ensureSQLiteColumn(
+                    statement,
+                    "appointments",
+                    "payment_method",
+                    "TEXT NOT NULL DEFAULT 'cash'"
+                );
             }
 
             statement.execute("""
@@ -180,6 +195,7 @@ public final class BookingServer {
                     customer_name TEXT NOT NULL,
                     customer_phone TEXT NOT NULL,
                     service_id TEXT NOT NULL,
+                    payment_method TEXT NOT NULL DEFAULT 'cash',
                     appointment_date TEXT NOT NULL,
                     appointment_time TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -190,6 +206,19 @@ public final class BookingServer {
                     cancelled_at TEXT NOT NULL
                 )
                 """);
+            if (USE_POSTGRES) {
+                statement.execute(
+                    "ALTER TABLE cancelled_appointments ADD COLUMN IF NOT EXISTS "
+                        + "payment_method TEXT NOT NULL DEFAULT 'cash'"
+                );
+            } else {
+                ensureSQLiteColumn(
+                    statement,
+                    "cancelled_appointments",
+                    "payment_method",
+                    "TEXT NOT NULL DEFAULT 'cash'"
+                );
+            }
             statement.execute("""
                 CREATE TABLE IF NOT EXISTS closed_dates (
                     appointment_date TEXT PRIMARY KEY,
@@ -215,10 +244,11 @@ public final class BookingServer {
 
     private static void ensureSQLiteColumn(
             Statement statement,
+            String tableName,
             String columnName,
             String columnDefinition) throws SQLException {
         boolean found = false;
-        try (ResultSet columns = statement.executeQuery("PRAGMA table_info(appointments)")) {
+        try (ResultSet columns = statement.executeQuery("PRAGMA table_info(" + tableName + ")")) {
             while (columns.next()) {
                 if (columnName.equals(columns.getString("name"))) {
                     found = true;
@@ -228,7 +258,7 @@ public final class BookingServer {
         }
         if (!found) {
             statement.execute(
-                "ALTER TABLE appointments ADD COLUMN " + columnName + " " + columnDefinition
+                "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition
             );
         }
     }
@@ -319,6 +349,22 @@ public final class BookingServer {
             JsonObject status = new JsonObject();
             status.addProperty("bookingEnabled", true);
             sendJson(exchange, 200, status);
+            return;
+        }
+        if ("/api/payment-info".equals(path)) {
+            if (!"GET".equals(method)) {
+                sendJson(exchange, 405, error("Método não permitido."));
+                return;
+            }
+            JsonObject paymentInfo = new JsonObject();
+            String recipient = normalizedWhatsAppRecipient();
+            boolean pixAvailable = PIX_KEY != null && !PIX_KEY.isBlank() && recipient != null;
+            paymentInfo.addProperty("pixAvailable", pixAvailable);
+            paymentInfo.addProperty("whatsappAvailable", recipient != null);
+            if (pixAvailable) {
+                paymentInfo.addProperty("pixKey", PIX_KEY.trim());
+            }
+            sendJson(exchange, 200, paymentInfo);
             return;
         }
         if ("/api/slots".equals(path)) {
@@ -534,13 +580,13 @@ public final class BookingServer {
         try (Connection connection = openConnection()) {
             try (PreparedStatement queryAppointments = connection.prepareStatement("""
                     SELECT id, customer_name, customer_phone, service_id,
-                           appointment_date, appointment_time, service_price_cents,
+                           payment_method, appointment_date, appointment_time, service_price_cents,
                            is_paid, paid_at, FALSE AS is_cancelled, '' AS cancellation_reason
                     FROM appointments
                     WHERE appointment_date BETWEEN ? AND ?
                     UNION ALL
                     SELECT original_appointment_id, customer_name, customer_phone, service_id,
-                           appointment_date, appointment_time, service_price_cents,
+                           payment_method, appointment_date, appointment_time, service_price_cents,
                            is_paid, paid_at, TRUE AS is_cancelled, cancellation_reason
                     FROM cancelled_appointments
                     WHERE appointment_date BETWEEN ? AND ?
@@ -559,6 +605,10 @@ public final class BookingServer {
                         String serviceId = result.getString("service_id");
                         appointment.addProperty("serviceId", serviceId);
                         appointment.addProperty("service", serviceName(serviceId));
+                        appointment.addProperty(
+                            "paymentMethod",
+                            paymentMethodName(result.getString("payment_method"))
+                        );
                         appointment.addProperty("date", result.getString("appointment_date"));
                         appointment.addProperty("time", result.getString("appointment_time"));
                         appointment.addProperty(
@@ -833,11 +883,11 @@ public final class BookingServer {
         return """
             INSERT INTO cancelled_appointments (
                 original_appointment_id, customer_name, customer_phone, service_id,
-                appointment_date, appointment_time, created_at, service_price_cents,
+                payment_method, appointment_date, appointment_time, created_at, service_price_cents,
                 is_paid, paid_at, cancellation_reason, cancelled_at
             )
             SELECT id, customer_name, customer_phone, service_id,
-                   appointment_date, appointment_time, created_at, service_price_cents,
+                   payment_method, appointment_date, appointment_time, created_at, service_price_cents,
                    is_paid, paid_at, ?, ?
             FROM appointments
             """ + whereClause;
@@ -981,13 +1031,29 @@ public final class BookingServer {
         String selectedTime = getString(payload, "time");
         String serviceId = getString(payload, "service");
         String dateValue = getString(payload, "date");
-        if (name == null || phone == null || selectedTime == null || serviceId == null) {
-            sendError(exchange, 400, "Preencha serviço, nome, WhatsApp, data e horário.");
+        String paymentMethod = getString(payload, "paymentMethod");
+        if (name == null || phone == null || selectedTime == null || serviceId == null
+                || paymentMethod == null) {
+            sendError(exchange, 400, "Preencha serviço, nome, WhatsApp, pagamento, data e horário.");
             return;
         }
         if (!SERVICES.containsKey(serviceId)) {
             sendError(exchange, 400, "Selecione um serviço válido da tabela de preços.");
             return;
+        }
+        if (!List.of("pix", "debit", "credit", "cash").contains(paymentMethod)) {
+            sendError(exchange, 400, "Selecione uma forma de pagamento válida.");
+            return;
+        }
+        if ("pix".equals(paymentMethod)) {
+            if (PIX_KEY == null || PIX_KEY.isBlank()) {
+                sendError(exchange, 503, "O Pix ainda não foi configurado pela barbearia.");
+                return;
+            }
+            if (normalizedWhatsAppRecipient() == null) {
+                sendError(exchange, 503, "O WhatsApp da barbearia ainda não foi configurado.");
+                return;
+            }
         }
 
         name = name.trim().replaceAll("\\s+", " ");
@@ -1019,6 +1085,7 @@ public final class BookingServer {
                     name,
                     phone,
                     serviceId,
+                    paymentMethod,
                     SERVICES.get(serviceId).priceCents(),
                     selectedDate,
                     selectedTime)) {
@@ -1039,7 +1106,17 @@ public final class BookingServer {
         response.addProperty("date", selectedDate.toString());
         response.addProperty("time", selectedTime);
         response.addProperty("message", "Agendamento confirmado. O horário foi reservado.");
-        String whatsappUrl = buildWhatsAppUrl(name, serviceId, selectedDate, selectedTime);
+        response.addProperty(
+            "whatsappText",
+            buildWhatsAppMessage(name, serviceId, paymentMethod, selectedDate, selectedTime)
+        );
+        String whatsappUrl = buildWhatsAppUrl(
+            name,
+            serviceId,
+            paymentMethod,
+            selectedDate,
+            selectedTime
+        );
         if (whatsappUrl == null) {
             response.addProperty(
                 "whatsappMessage",
@@ -1054,12 +1131,38 @@ public final class BookingServer {
     private static String buildWhatsAppUrl(
             String name,
             String serviceId,
+            String paymentMethod,
             LocalDate selectedDate,
             String selectedTime) {
-        if (WHATSAPP_RECIPIENT == null || WHATSAPP_RECIPIENT.isBlank()) {
-            return null;
-        }
+        String recipient = normalizedWhatsAppRecipient();
+        if (recipient == null) return null;
 
+        return "https://wa.me/" + recipient + "?text="
+            + URLEncoder.encode(
+                buildWhatsAppMessage(name, serviceId, paymentMethod, selectedDate, selectedTime),
+                StandardCharsets.UTF_8
+            );
+    }
+
+    private static String buildWhatsAppMessage(
+            String name,
+            String serviceId,
+            String paymentMethod,
+            LocalDate selectedDate,
+            String selectedTime) {
+        Service service = SERVICES.get(serviceId);
+        return "Olá! Acabei de confirmar um agendamento na ZMB dos Cortes."
+            + "\nNome: " + name
+            + "\nServiço: " + service.name()
+            + "\nValor: " + formatPrice(service.priceCents())
+            + "\nPagamento: " + paymentMethodName(paymentMethod)
+            + "\nData: " + selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+            + "\nHorário: " + selectedTime
+            + ("pix".equals(paymentMethod) ? "\nEstou enviando o comprovante do Pix em anexo." : "");
+    }
+
+    private static String normalizedWhatsAppRecipient() {
+        if (WHATSAPP_RECIPIENT == null || WHATSAPP_RECIPIENT.isBlank()) return null;
         String recipient = WHATSAPP_RECIPIENT.replaceAll("\\D", "");
         if (recipient.startsWith("00")) {
             recipient = recipient.substring(2);
@@ -1067,25 +1170,25 @@ public final class BookingServer {
         if (recipient.length() == 10 || recipient.length() == 11) {
             recipient = "55" + recipient;
         }
-        if (!recipient.startsWith("55") || recipient.length() < 12 || recipient.length() > 13) {
-            return null;
-        }
+        return recipient.startsWith("55") && recipient.length() >= 12 && recipient.length() <= 13
+            ? recipient
+            : null;
+    }
 
-        Service service = SERVICES.get(serviceId);
-        String message = "Olá! Acabei de confirmar um agendamento na ZMB dos Cortes."
-            + "\nNome: " + name
-            + "\nServiço: " + service.name()
-            + "\nValor: " + formatPrice(service.priceCents())
-            + "\nData: " + selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-            + "\nHorário: " + selectedTime;
-        return "https://wa.me/" + recipient + "?text="
-            + URLEncoder.encode(message, StandardCharsets.UTF_8);
+    private static String paymentMethodName(String paymentMethod) {
+        return switch (paymentMethod == null ? "cash" : paymentMethod) {
+            case "pix" -> "Pix";
+            case "debit" -> "Cartão de débito";
+            case "credit" -> "Cartão de crédito";
+            default -> "Espécie";
+        };
     }
 
     private static boolean reserveSlot(
             String name,
             String phone,
             String serviceId,
+            String paymentMethod,
             long servicePriceCents,
             LocalDate selectedDate,
             String selectedTime) throws SQLException {
@@ -1114,8 +1217,8 @@ public final class BookingServer {
                         INSERT INTO appointments (
                             customer_name, customer_phone, service_id,
                             appointment_date, appointment_time, created_at,
-                            service_price_cents, is_paid
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+                            service_price_cents, is_paid, payment_method
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, ?)
                         """)) {
                     insert.setString(1, name);
                     insert.setString(2, phone);
@@ -1124,6 +1227,7 @@ public final class BookingServer {
                     insert.setString(5, selectedTime);
                     insert.setString(6, LocalDateTime.now(LOCAL_ZONE).toString());
                     insert.setLong(7, servicePriceCents);
+                    insert.setString(8, paymentMethod);
                     insert.executeUpdate();
                 }
                 commitTransaction(connection);

@@ -6,10 +6,22 @@ const form = document.querySelector("#booking-form");
 const submitButton = document.querySelector("#submit-button");
 const statusMessage = document.querySelector("#form-status");
 const serviceSelect = document.querySelector("#service-type");
+const paymentProofInput = document.querySelector("#payment-proof");
+const pixDetails = document.querySelector("#pix-details");
+const pixStatus = document.querySelector("#pix-status");
+const pixKey = document.querySelector("#pix-key");
+const pixRadio = document.querySelector('input[name="payment-method"][value="pix"]');
+const sendProofButton = document.querySelector("#send-proof-button");
+const proofStatus = document.querySelector("#proof-status");
 const SLOT_REFRESH_INTERVAL_MS = 10000;
 let selectedTime = "";
 let slotsRequestId = 0;
 let bookingInProgress = false;
+let bookingComplete = false;
+let paymentInfo = null;
+let confirmedWhatsAppUrl = "";
+let confirmedWhatsAppText = "";
+let confirmedReceiptFile = null;
 
 const dailyTimes = [];
 for (const [start, end] of [[9 * 60, 11 * 60 + 20], [13 * 60, 18 * 60 + 15]]) {
@@ -31,7 +43,36 @@ function setStatus(message, type) {
 }
 
 function updateSubmitState() {
-  submitButton.disabled = bookingInProgress || !selectedTime || !form.checkValidity();
+  submitButton.disabled = bookingInProgress || bookingComplete || !selectedTime || !form.checkValidity();
+}
+
+function selectedPaymentMethod() {
+  return form.querySelector('input[name="payment-method"]:checked')?.value || "";
+}
+
+function updatePaymentFields() {
+  const isPix = selectedPaymentMethod() === "pix";
+  pixDetails.hidden = !isPix;
+  paymentProofInput.required = isPix;
+  if (!isPix) {
+    paymentProofInput.setCustomValidity("");
+  }
+  updateSubmitState();
+}
+
+function validatePaymentProof() {
+  const file = paymentProofInput.files[0];
+  if (!file) {
+    paymentProofInput.setCustomValidity("Selecione o comprovante do Pix.");
+    return false;
+  }
+  const allowedTypes = ["image/jpeg", "image/png", "application/pdf"];
+  if (!allowedTypes.includes(file.type) || file.size > 10 * 1024 * 1024) {
+    paymentProofInput.setCustomValidity("Escolha uma imagem JPG/PNG ou PDF de até 10 MB.");
+    return false;
+  }
+  paymentProofInput.setCustomValidity("");
+  return true;
 }
 
 async function readApiResponse(response, fallbackMessage) {
@@ -130,11 +171,47 @@ async function loadSlots({ preserveSelection = false } = {}) {
   }
 }
 
+async function loadPaymentInfo() {
+  try {
+    const response = await fetch("/api/payment-info");
+    paymentInfo = await readApiResponse(response, "Não foi possível carregar as informações do Pix.");
+    if (paymentInfo.pixAvailable) {
+      pixRadio.disabled = false;
+      pixKey.textContent = paymentInfo.pixKey;
+      pixStatus.textContent = "Faça o Pix no valor do serviço e anexe o comprovante.";
+    } else {
+      pixRadio.disabled = true;
+      pixStatus.textContent = "Pix indisponível no momento. Escolha pagamento na barbearia.";
+    }
+  } catch {
+    pixRadio.disabled = true;
+    pixStatus.textContent = "Não foi possível carregar os dados do Pix. Escolha pagamento na barbearia.";
+  }
+  updateSubmitState();
+}
+
 dateInput.min = localDateString(new Date());
 dateInput.max = "2030-12-31";
 dateInput.addEventListener("change", loadSlots);
 form.addEventListener("input", updateSubmitState);
+form.querySelectorAll('input[name="payment-method"]').forEach((input) => {
+  input.addEventListener("change", updatePaymentFields);
+});
+paymentProofInput.addEventListener("change", () => {
+  if (selectedPaymentMethod() === "pix") validatePaymentProof();
+  updateSubmitState();
+});
+document.querySelector("#copy-pix-button").addEventListener("click", async () => {
+  if (!paymentInfo?.pixKey) return;
+  try {
+    await navigator.clipboard.writeText(paymentInfo.pixKey);
+    pixStatus.textContent = "Chave Pix copiada.";
+  } catch {
+    pixStatus.textContent = "Não foi possível copiar. Selecione e copie a chave Pix.";
+  }
+});
 loadSlots();
+loadPaymentInfo();
 setInterval(() => {
   if (!document.hidden && dateInput.value && !bookingInProgress) {
     loadSlots({ preserveSelection: true });
@@ -153,7 +230,13 @@ window.addEventListener("focus", () => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const paymentMethod = selectedPaymentMethod();
+  if (paymentMethod === "pix" && !validatePaymentProof()) {
+    paymentProofInput.reportValidity();
+    return;
+  }
   if (!selectedTime || !form.reportValidity()) return;
+  confirmedReceiptFile = paymentMethod === "pix" ? paymentProofInput.files[0] : null;
 
   bookingInProgress = true;
   submitButton.disabled = true;
@@ -175,14 +258,26 @@ form.addEventListener("submit", async (event) => {
         time: booking.time,
         service: serviceSelect.value,
         name: booking.name,
-        phone: booking.phone
+        phone: booking.phone,
+        paymentMethod
       })
     });
     const result = await readApiResponse(response, "Não foi possível confirmar este horário.");
 
-    document.querySelector("#customer-name").value = "";
-    document.querySelector("#customer-phone").value = "";
+    bookingComplete = true;
+    confirmedWhatsAppUrl = result.whatsappUrl || "";
+    confirmedWhatsAppText = result.whatsappText || "";
     await loadSlots();
+    if (paymentMethod === "pix") {
+      setStatus("Agendamento reservado. Agora envie o comprovante para a barbearia pelo WhatsApp.", "success");
+      sendProofButton.hidden = false;
+      submitButton.hidden = true;
+      if (!confirmedWhatsAppUrl) {
+        setStatus(result.whatsappMessage || "O WhatsApp da barbearia não está configurado. O agendamento foi reservado; entre em contato para enviar o comprovante.", "error");
+        sendProofButton.disabled = true;
+      }
+      return;
+    }
     if (result.whatsappUrl) {
       setStatus("Agendamento confirmado. Toque em Enviar no WhatsApp para avisar a barbearia.", "success");
       window.location.assign(result.whatsappUrl);
@@ -196,5 +291,32 @@ form.addEventListener("submit", async (event) => {
     bookingInProgress = false;
     submitButton.innerHTML = 'Confirmar agendamento <span aria-hidden="true">↗</span>';
     updateSubmitState();
+  }
+});
+
+sendProofButton.addEventListener("click", async () => {
+  if (!confirmedWhatsAppUrl || !confirmedReceiptFile) return;
+  sendProofButton.disabled = true;
+  try {
+    if (navigator.canShare?.({ files: [confirmedReceiptFile] }) && navigator.share) {
+      await navigator.share({
+        files: [confirmedReceiptFile],
+        title: "Comprovante do Pix — ZMB Dos Cortes",
+        text: confirmedWhatsAppText
+      });
+      proofStatus.textContent = "Compartilhamento aberto. Confirme o envio do comprovante no WhatsApp.";
+    } else {
+      proofStatus.textContent = "Anexe o comprovante selecionado nesta conversa e toque em Enviar no WhatsApp.";
+      window.location.assign(confirmedWhatsAppUrl);
+    }
+  } catch (error) {
+    if (error.name === "AbortError") {
+      proofStatus.textContent = "O compartilhamento foi cancelado. Você ainda precisa enviar o comprovante pelo WhatsApp.";
+    } else {
+      proofStatus.textContent = "Não foi possível abrir o compartilhamento. Anexe o comprovante manualmente no WhatsApp.";
+    }
+    window.location.assign(confirmedWhatsAppUrl);
+  } finally {
+    sendProofButton.disabled = false;
   }
 });

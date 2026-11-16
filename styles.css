@@ -12,6 +12,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; }
 body { margin: 0; color: var(--ink); background: var(--paper); }
 a { color: inherit; text-decoration: none; }
@@ -114,6 +115,21 @@ h1 em { color: var(--accent); font-weight: 500; }
 }
 .booking-card input:focus, .booking-card select:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(53,90,71,.1); }
 .booking-card input::placeholder { color: #a19d95; }
+.payment-fieldset { display: grid; gap: 9px; margin: 20px 0 14px; padding: 0; border: 0; }
+.payment-fieldset legend { margin-bottom: 9px; color: #393833; font-size: 11px; font-weight: 700; }
+.payment-option { display: flex !important; align-items: flex-start; gap: 10px; margin: 0 !important; padding: 12px; border: 1px solid var(--line); cursor: pointer; }
+.payment-option:has(input:checked) { border-color: var(--green); background: #f6f8f5; }
+.payment-option input { width: auto; min-height: 0; margin: 2px 0 0; accent-color: var(--green); }
+.payment-option strong, .payment-option small { display: block; }
+.payment-option strong { font-size: 11px; }
+.payment-option small { margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; line-height: 1.5; }
+.pix-details { margin: 0 0 5px; padding: 14px; background: #f7f6f3; }
+.payment-hint { margin: 0 0 9px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.pix-key-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.pix-key { overflow-wrap: anywhere; color: var(--green); font-size: 12px; font-weight: 700; }
+.copy-pix-button { flex: 0 0 auto; padding: 7px 9px; border: 1px solid var(--line); color: var(--ink); background: var(--white); font-size: 10px; }
+.pix-details input[type="file"] { min-height: 0; padding: 10px; background: var(--white); }
+.proof-submit-button { margin-top: 15px; }
 .field-hint { margin: 2px 0 22px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .time-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .time-fieldset legend { margin-bottom: 10px; padding: 0; }

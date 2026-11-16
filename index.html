@@ -117,11 +117,42 @@
         <input id="customer-name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="Como podemos te chamar?" required>
         <label for="customer-phone">Seu WhatsApp</label>
         <input id="customer-phone" name="phone" type="tel" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="(83) 99999-9999" required>
+        <fieldset class="payment-fieldset">
+          <legend>Forma de pagamento</legend>
+          <label class="payment-option">
+            <input type="radio" name="payment-method" value="pix" required disabled>
+            <span><strong>Pix antecipado</strong><small>Envie o comprovante obrigatório pelo WhatsApp.</small></span>
+          </label>
+          <div class="pix-details" id="pix-details" hidden>
+            <p class="payment-hint" id="pix-status">Carregando dados do Pix...</p>
+            <div class="pix-key-row">
+              <span class="pix-key" id="pix-key"></span>
+              <button class="copy-pix-button" id="copy-pix-button" type="button">Copiar chave</button>
+            </div>
+            <label for="payment-proof">Comprovante do Pix <span aria-hidden="true">*</span></label>
+            <input id="payment-proof" name="payment-proof" type="file" accept="image/jpeg,image/png,application/pdf" aria-describedby="proof-hint">
+            <p class="payment-hint" id="proof-hint">Obrigatório. Envie uma imagem ou PDF de até 10 MB. O WhatsApp pedirá que você confirme o envio.</p>
+          </div>
+          <label class="payment-option">
+            <input type="radio" name="payment-method" value="debit" required>
+            <span><strong>Cartão de débito</strong><small>Pagamento na barbearia.</small></span>
+          </label>
+          <label class="payment-option">
+            <input type="radio" name="payment-method" value="credit" required>
+            <span><strong>Cartão de crédito</strong><small>Pagamento na barbearia.</small></span>
+          </label>
+          <label class="payment-option">
+            <input type="radio" name="payment-method" value="cash" required>
+            <span><strong>Espécie</strong><small>Pagamento na barbearia.</small></span>
+          </label>
+        </fieldset>
         <button class="submit-button" id="submit-button" type="submit" disabled>
           Confirmar agendamento <span aria-hidden="true">↗</span>
         </button>
         <p class="privacy-note">Seu telefone será usado pela barbearia para responder sobre este agendamento.</p>
         <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+        <button class="submit-button proof-submit-button" id="send-proof-button" type="button" hidden>Enviar comprovante pelo WhatsApp <span aria-hidden="true">↗</span></button>
+        <p class="form-status" id="proof-status" role="status" aria-live="polite"></p>
       </form>
     </section>
 
