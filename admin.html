@@ -47,24 +47,36 @@
       <section class="report-panel" aria-labelledby="report-title">
         <div class="panel-heading">
           <div>
-            <h2 id="report-title">Relatório mensal de agendamentos</h2>
-            <p>O total considera pagamentos recebidos no mês de agendamentos ativos, mesmo que o atendimento seja em outro mês. A lista mostra apenas os atendimentos ativos do mês escolhido; cancelados não entram no relatório nem no total.</p>
+            <h2 id="report-title">Relatório de agendamentos</h2>
+            <p>Escolha um mês ou uma semana de terça a sábado. Ao escolher domingo, será consultada a semana anterior; ao escolher segunda, a próxima. Na consulta semanal, o total não inclui recebimentos de domingo e segunda. O total considera pagamentos recebidos no período, mesmo que o atendimento seja em outro período. Cancelados não entram no relatório nem no total.</p>
           </div>
           <button class="secondary-button" id="export-button" type="button">Baixar CSV</button>
         </div>
         <form class="filter-form" id="report-form">
           <div class="field">
+            <label for="report-period">Consultar por</label>
+            <select id="report-period">
+              <option value="month">Mês</option>
+              <option value="week">Semana</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="report-month">Mês e ano</label>
             <input id="report-month" name="month" type="month" max="2030-12" required>
+          </div>
+          <div class="field" id="report-week-field" hidden>
+            <label for="report-week-date">Escolha um dia da semana</label>
+            <input id="report-week-date" name="week-date" type="date" min="0001-01-01" max="2030-12-31" disabled>
           </div>
           <button class="primary-button" type="submit">Consultar</button>
           <button class="secondary-button" id="whatsapp-report-button" type="button" disabled>Preparar relatório para WhatsApp</button>
         </form>
         <div class="summary-card">
-          <span>Valor recebido no mês</span>
+          <span id="received-label">Valor recebido no mês</span>
           <strong id="received-total">R$ 0,00</strong>
         </div>
         <p class="status-message" id="report-status" role="status" aria-live="polite"></p>
+        <p class="report-period-label" id="report-period-label" aria-live="polite"></p>
         <div class="whatsapp-report" id="whatsapp-report" hidden aria-live="polite"></div>
         <div class="table-wrap">
           <table>
@@ -83,7 +95,7 @@
             <tbody id="appointment-rows"></tbody>
           </table>
         </div>
-        <p class="empty-state" id="empty-state" hidden>Nenhum agendamento encontrado nesse mês.</p>
+        <p class="empty-state" id="empty-state" hidden>Nenhum agendamento encontrado neste período.</p>
       </section>
 
       <div class="admin-columns">

@@ -8,6 +8,11 @@ const logoutButton = document.querySelector("#logout-button");
 const reportForm = document.querySelector("#report-form");
 const reportStatus = document.querySelector("#report-status");
 const reportMonth = document.querySelector("#report-month");
+const reportPeriod = document.querySelector("#report-period");
+const reportWeekField = document.querySelector("#report-week-field");
+const reportWeekDate = document.querySelector("#report-week-date");
+const reportPeriodLabel = document.querySelector("#report-period-label");
+const receivedLabel = document.querySelector("#received-label");
 const whatsappReportButton = document.querySelector("#whatsapp-report-button");
 const whatsappReport = document.querySelector("#whatsapp-report");
 const exportButton = document.querySelector("#export-button");
@@ -19,10 +24,11 @@ const receivedTotal = document.querySelector("#received-total");
 const closeForm = document.querySelector("#close-form");
 const closeStatus = document.querySelector("#close-status");
 let currentReport = null;
+let currentReportPeriod = null;
 let reportRequestId = 0;
 
 function localDateString(date) {
-  const year = date.getFullYear();
+  const year = String(date.getFullYear()).padStart(4, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
@@ -168,8 +174,10 @@ function renderClosures(closures) {
 
 function clearReport() {
   currentReport = null;
+  currentReportPeriod = null;
   reportRequestId++;
   receivedTotal.textContent = "—";
+  reportPeriodLabel.textContent = "";
   appointmentRows.replaceChildren();
   closureList.replaceChildren();
   emptyState.hidden = true;
@@ -193,18 +201,51 @@ function monthBounds(value) {
   return { from: `${value}-01`, to: `${value}-${String(lastDay).padStart(2, "0")}` };
 }
 
+function weekBounds(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value < "0001-01-01" || value > "2030-12-31") {
+    throw new Error("Selecione uma data válida até 31/12/2030.");
+  }
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime()) || localDateString(date) !== value) {
+    throw new Error("Selecione uma data válida.");
+  }
+  const day = date.getDay();
+  date.setDate(date.getDate() + (day === 0 ? -5 : 2 - day));
+  const from = localDateString(date);
+  date.setDate(date.getDate() + 4);
+  const to = localDateString(date);
+  return { from, to: to > "2030-12-31" ? "2030-12-31" : to };
+}
+
+function updateReportFields() {
+  const weekly = reportPeriod.value === "week";
+  reportMonth.parentElement.hidden = weekly;
+  reportMonth.disabled = weekly;
+  reportWeekField.hidden = !weekly;
+  reportWeekDate.disabled = !weekly;
+  reportWeekDate.required = weekly;
+  receivedLabel.textContent = weekly ? "Valor recebido na semana" : "Valor recebido no mês";
+  clearReport();
+  setStatus(reportStatus, "Selecione Consultar para carregar o período escolhido.");
+}
+
 async function loadReport() {
   setStatus(reportStatus, "");
   clearReport();
   const requestId = reportRequestId;
-  const month = reportMonth.value;
+  const period = reportPeriod.value;
+  const value = period === "week" ? reportWeekDate.value : reportMonth.value;
   try {
-    const { from, to } = monthBounds(month);
+    const { from, to } = period === "week" ? weekBounds(value) : monthBounds(value);
     const report = await request(
       `/api/admin/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     );
-    if (requestId !== reportRequestId || reportMonth.value !== month) return;
+    if (requestId !== reportRequestId) return;
     currentReport = report;
+    currentReportPeriod = period === "week"
+      ? `Semana de ${dateLabel(from)} a ${dateLabel(to)}`
+      : `${value.slice(5, 7)}/${value.slice(0, 4)}`;
+    reportPeriodLabel.textContent = `Período consultado: ${dateLabel(from)} a ${dateLabel(to)}.`;
     receivedTotal.textContent = moneyLabel(currentReport.receivedCents);
     renderAppointments(currentReport.appointments);
     renderClosures(currentReport.closures);
@@ -229,7 +270,7 @@ function prepareWhatsAppReport() {
     return;
   }
   setStatus(reportStatus, "");
-  const title = `Agendamentos ZMB Dos Cortes — ${reportMonth.value.slice(5, 7)}/${reportMonth.value.slice(0, 4)}`;
+  const title = `Agendamentos ZMB Dos Cortes — ${currentReportPeriod}`;
   const lines = currentReport.appointments.map((appointment) => {
     const status = appointment.cancelled ? "Cancelado" : "Ativo";
     const payment = appointment.paid ? "Pago" : "Pendente";
@@ -241,7 +282,7 @@ function prepareWhatsAppReport() {
       + `Serviço: ${appointment.service}\nValor: ${moneyLabel(appointment.priceCents)}\n`
       + `Pagamento: ${appointment.paymentMethod} — ${payment}\nSituação: ${status}${reason}`;
   });
-  const entries = lines.length ? lines : ["Nenhum agendamento neste mês."];
+  const entries = lines.length ? lines : ["Nenhum agendamento neste período."];
   const chunks = [];
   let chunk = "";
   let encodedLength = 0;
@@ -375,9 +416,10 @@ reportForm.addEventListener("submit", async (event) => {
 });
 
 document.querySelector("#refresh-button").addEventListener("click", loadReport);
-reportMonth.addEventListener("input", () => {
+reportPeriod.addEventListener("change", updateReportFields);
+for (const input of [reportMonth, reportWeekDate]) input.addEventListener("input", () => {
   clearReport();
-  setStatus(reportStatus, "Selecione Consultar para carregar o mês escolhido.");
+  setStatus(reportStatus, "Selecione Consultar para carregar o período escolhido.");
 });
 exportButton.addEventListener("click", downloadReport);
 whatsappReportButton.addEventListener("click", prepareWhatsAppReport);
@@ -434,6 +476,7 @@ async function initializeAdminPage() {
 }
 
 reportMonth.value = localDateString(new Date()).slice(0, 7);
+reportWeekDate.value = localDateString(new Date());
 document.querySelector("#close-date").value = localDateString(new Date());
 document.querySelector("#close-date").min = localDateString(new Date());
 showLogin();
