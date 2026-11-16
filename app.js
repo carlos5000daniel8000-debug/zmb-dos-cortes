@@ -13,6 +13,7 @@ const pixKey = document.querySelector("#pix-key");
 const pixRadio = document.querySelector('input[name="payment-method"][value="pix"]');
 const sendProofButton = document.querySelector("#send-proof-button");
 const proofStatus = document.querySelector("#proof-status");
+const confirmProofSentButton = document.querySelector("#confirm-proof-sent-button");
 const SLOT_REFRESH_INTERVAL_MS = 10000;
 let selectedTime = "";
 let slotsRequestId = 0;
@@ -271,10 +272,12 @@ form.addEventListener("submit", async (event) => {
     if (paymentMethod === "pix") {
       setStatus("Agendamento reservado. Agora envie o comprovante para a barbearia pelo WhatsApp.", "success");
       sendProofButton.hidden = false;
+      confirmProofSentButton.hidden = false;
       submitButton.hidden = true;
       if (!confirmedWhatsAppUrl) {
-        setStatus(result.whatsappMessage || "O WhatsApp da barbearia não está configurado. O agendamento foi reservado; entre em contato para enviar o comprovante.", "error");
+        setStatus(result.whatsappMessage || "O WhatsApp da barbearia não está configurado. O agendamento foi reservado; entre em contato para enviar a confirmação e o comprovante.", "error");
         sendProofButton.disabled = true;
+        confirmProofSentButton.disabled = true;
       }
       return;
     }
@@ -304,19 +307,30 @@ sendProofButton.addEventListener("click", async () => {
         title: "Comprovante do Pix — ZMB Dos Cortes",
         text: confirmedWhatsAppText
       });
-      proofStatus.textContent = "Compartilhamento aberto. Confirme o envio do comprovante no WhatsApp.";
+      proofStatus.textContent = "Compartilhamento concluído. Confirme abaixo somente depois de enviar a confirmação e o comprovante pelo WhatsApp.";
     } else {
-      proofStatus.textContent = "Anexe o comprovante selecionado nesta conversa e toque em Enviar no WhatsApp.";
+      proofStatus.textContent = "No WhatsApp, anexe o comprovante selecionado, confira a confirmação do agendamento e toque em Enviar. Depois, confirme abaixo.";
       window.location.assign(confirmedWhatsAppUrl);
     }
+    confirmProofSentButton.disabled = false;
   } catch (error) {
     if (error.name === "AbortError") {
-      proofStatus.textContent = "O compartilhamento foi cancelado. Você ainda precisa enviar o comprovante pelo WhatsApp.";
+      proofStatus.textContent = "O compartilhamento foi cancelado. A confirmação continua pendente; tente novamente e envie pelo WhatsApp.";
     } else {
-      proofStatus.textContent = "Não foi possível abrir o compartilhamento. Anexe o comprovante manualmente no WhatsApp.";
+      proofStatus.textContent = "Não foi possível abrir o compartilhamento. Envie a confirmação no WhatsApp e anexe o comprovante manualmente; depois, confirme abaixo.";
+      confirmProofSentButton.disabled = false;
     }
-    window.location.assign(confirmedWhatsAppUrl);
+    if (error.name !== "AbortError") {
+      window.location.assign(confirmedWhatsAppUrl);
+    }
   } finally {
     sendProofButton.disabled = false;
   }
+});
+
+confirmProofSentButton.addEventListener("click", () => {
+  sendProofButton.hidden = true;
+  confirmProofSentButton.hidden = true;
+  proofStatus.textContent = "Você confirmou que enviou a confirmação do agendamento e o comprovante pelo WhatsApp. A barbearia ainda precisa confirmar o recebimento do Pix.";
+  proofStatus.classList.add("success");
 });

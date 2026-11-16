@@ -121,7 +121,7 @@
           <legend>Forma de pagamento</legend>
           <label class="payment-option">
             <input type="radio" name="payment-method" value="pix" required disabled>
-            <span><strong>Pix antecipado</strong><small>Envie o comprovante obrigatório pelo WhatsApp.</small></span>
+            <span><strong>Pix antecipado</strong><small>Compartilhe a confirmação do agendamento e o comprovante pelo WhatsApp.</small></span>
           </label>
           <div class="pix-details" id="pix-details" hidden>
             <p class="payment-hint" id="pix-status">Carregando dados do Pix...</p>
@@ -131,7 +131,7 @@
             </div>
             <label for="payment-proof">Comprovante do Pix <span aria-hidden="true">*</span></label>
             <input id="payment-proof" name="payment-proof" type="file" accept="image/jpeg,image/png,application/pdf" aria-describedby="proof-hint">
-            <p class="payment-hint" id="proof-hint">Obrigatório. Envie uma imagem ou PDF de até 10 MB. O WhatsApp pedirá que você confirme o envio.</p>
+            <p class="payment-hint" id="proof-hint">Obrigatório. Você precisará compartilhar o comprovante junto da confirmação e confirmar que enviou pelo WhatsApp. Imagem ou PDF de até 10 MB.</p>
           </div>
           <label class="payment-option">
             <input type="radio" name="payment-method" value="debit" required>
@@ -151,8 +151,9 @@
         </button>
         <p class="privacy-note">Seu telefone será usado pela barbearia para responder sobre este agendamento.</p>
         <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
-        <button class="submit-button proof-submit-button" id="send-proof-button" type="button" hidden>Enviar comprovante pelo WhatsApp <span aria-hidden="true">↗</span></button>
+        <button class="submit-button proof-submit-button" id="send-proof-button" type="button" hidden>Compartilhar confirmação e comprovante <span aria-hidden="true">↗</span></button>
         <p class="form-status" id="proof-status" role="status" aria-live="polite"></p>
+        <button class="submit-button proof-submit-button" id="confirm-proof-sent-button" type="button" hidden disabled>Confirmar que enviei pelo WhatsApp</button>
       </form>
     </section>
 
