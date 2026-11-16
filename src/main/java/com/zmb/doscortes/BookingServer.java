@@ -718,7 +718,7 @@ public final class BookingServer {
                     sendError(exchange, 400, "O motivo deve ter até 160 caracteres.");
                     return;
                 }
-                updated = cancelAppointment(appointmentId, reason);
+                updated = cancelAppointment(appointmentId);
             } else {
                 sendError(exchange, 404, "Não encontrado.");
                 return;
@@ -770,7 +770,7 @@ public final class BookingServer {
         }
     }
 
-    private static boolean cancelAppointment(long appointmentId, String reason)
+    private static boolean cancelAppointment(long appointmentId)
             throws SQLException {
         try (Connection connection = openConnection()) {
             LocalDate appointmentDate = findAppointmentDate(connection, appointmentId);
@@ -779,15 +779,13 @@ public final class BookingServer {
             }
             beginTransaction(connection, appointmentDate);
             try {
-                boolean archived = archiveAppointment(connection, appointmentId, reason);
-                if (!archived) {
-                    rollbackTransaction(connection);
-                    return false;
-                }
                 try (PreparedStatement delete = connection.prepareStatement(
                         "DELETE FROM appointments WHERE id = ?")) {
                     delete.setLong(1, appointmentId);
-                    delete.executeUpdate();
+                    if (delete.executeUpdate() == 0) {
+                        rollbackTransaction(connection);
+                        return false;
+                    }
                 }
                 commitTransaction(connection);
                 return true;
@@ -851,7 +849,6 @@ public final class BookingServer {
                     insert.setString(3, LocalDateTime.now(LOCAL_ZONE).toString());
                     insert.executeUpdate();
                 }
-                archiveAppointmentsForDate(connection, date, reason);
                 try (PreparedStatement delete = connection.prepareStatement(
                         "DELETE FROM appointments WHERE appointment_date = ?")) {
                     delete.setString(1, date.toString());
@@ -863,45 +860,6 @@ public final class BookingServer {
                 rollbackAfterFailure(connection, exception);
                 throw exception;
             }
-        }
-    }
-
-    private static String archiveSql(String whereClause) {
-        return """
-            INSERT INTO cancelled_appointments (
-                original_appointment_id, customer_name, customer_phone, service_id,
-                payment_method, appointment_date, appointment_time, created_at, service_price_cents,
-                is_paid, paid_at, cancellation_reason, cancelled_at
-            )
-            SELECT id, customer_name, customer_phone, service_id,
-                   payment_method, appointment_date, appointment_time, created_at, service_price_cents,
-                   is_paid, paid_at, ?, ?
-            FROM appointments
-            """ + whereClause;
-    }
-
-    private static boolean archiveAppointment(
-            Connection connection,
-            long appointmentId,
-            String reason) throws SQLException {
-        try (PreparedStatement archive = connection.prepareStatement(archiveSql("WHERE id = ?"))) {
-            archive.setString(1, reason);
-            archive.setString(2, LocalDateTime.now(LOCAL_ZONE).toString());
-            archive.setLong(3, appointmentId);
-            return archive.executeUpdate() == 1;
-        }
-    }
-
-    private static void archiveAppointmentsForDate(
-            Connection connection,
-            LocalDate date,
-            String reason) throws SQLException {
-        try (PreparedStatement archive = connection.prepareStatement(
-                archiveSql("WHERE appointment_date = ?"))) {
-            archive.setString(1, reason);
-            archive.setString(2, LocalDateTime.now(LOCAL_ZONE).toString());
-            archive.setString(3, date.toString());
-            archive.executeUpdate();
         }
     }
 

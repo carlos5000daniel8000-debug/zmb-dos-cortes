@@ -342,7 +342,7 @@ async function updatePayment(appointment) {
 
 async function cancelAppointment(appointment) {
   const confirmed = window.confirm(
-    `Cancelar o agendamento de ${appointment.name} em ${dateLabel(appointment.date)} às ${appointment.time}?`
+    `Cancelar o agendamento de ${appointment.name} em ${dateLabel(appointment.date)} às ${appointment.time}? Os dados do agendamento e do pagamento serão excluídos permanentemente.`
   );
   if (!confirmed) return;
   try {
@@ -429,7 +429,7 @@ closeForm.addEventListener("submit", async (event) => {
   const date = document.querySelector("#close-date").value;
   const reason = document.querySelector("#close-reason").value.trim();
   if (!window.confirm(
-    `Fechar a agenda de ${dateLabel(date)} e cancelar também os agendamentos existentes nessa data?`
+    `Fechar a agenda de ${dateLabel(date)} e cancelar os agendamentos existentes? Os dados desses agendamentos e pagamentos serão excluídos permanentemente.`
   )) {
     return;
   }
