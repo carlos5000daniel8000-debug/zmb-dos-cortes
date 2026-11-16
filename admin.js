@@ -7,6 +7,10 @@ const loginStatus = document.querySelector("#login-status");
 const logoutButton = document.querySelector("#logout-button");
 const reportForm = document.querySelector("#report-form");
 const reportStatus = document.querySelector("#report-status");
+const reportMonth = document.querySelector("#report-month");
+const whatsappReportButton = document.querySelector("#whatsapp-report-button");
+const whatsappReport = document.querySelector("#whatsapp-report");
+const exportButton = document.querySelector("#export-button");
 const appointmentRows = document.querySelector("#appointment-rows");
 const emptyState = document.querySelector("#empty-state");
 const closureList = document.querySelector("#closure-list");
@@ -15,6 +19,7 @@ const receivedTotal = document.querySelector("#received-total");
 const closeForm = document.querySelector("#close-form");
 const closeStatus = document.querySelector("#close-status");
 let currentReport = null;
+let reportRequestId = 0;
 
 function localDateString(date) {
   const year = date.getFullYear();
@@ -48,6 +53,7 @@ async function request(url, options = {}) {
 }
 
 function showLogin(message = "") {
+  clearReport();
   loginSection.hidden = false;
   dashboardSection.hidden = true;
   logoutButton.hidden = true;
@@ -160,24 +166,120 @@ function renderClosures(closures) {
   }
 }
 
+function clearReport() {
+  currentReport = null;
+  reportRequestId++;
+  receivedTotal.textContent = "—";
+  appointmentRows.replaceChildren();
+  closureList.replaceChildren();
+  emptyState.hidden = true;
+  closuresEmpty.hidden = true;
+  whatsappReport.replaceChildren();
+  whatsappReport.hidden = true;
+  whatsappReportButton.disabled = true;
+  exportButton.disabled = true;
+}
+
+function monthBounds(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!match) throw new Error("Selecione um mês e ano válidos.");
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (year < 1 || year > 2030 || month < 1 || month > 12) {
+    throw new Error("Selecione um mês válido até dezembro de 2030.");
+  }
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const lastDay = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return { from: `${value}-01`, to: `${value}-${String(lastDay).padStart(2, "0")}` };
+}
+
 async function loadReport() {
   setStatus(reportStatus, "");
-  const from = document.querySelector("#report-from").value;
-  const to = document.querySelector("#report-to").value;
+  clearReport();
+  const requestId = reportRequestId;
+  const month = reportMonth.value;
   try {
-    currentReport = await request(
+    const { from, to } = monthBounds(month);
+    const report = await request(
       `/api/admin/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     );
+    if (requestId !== reportRequestId || reportMonth.value !== month) return;
+    currentReport = report;
     receivedTotal.textContent = moneyLabel(currentReport.receivedCents);
     renderAppointments(currentReport.appointments);
     renderClosures(currentReport.closures);
+    exportButton.disabled = false;
+    whatsappReportButton.disabled = false;
   } catch (error) {
+    if (requestId !== reportRequestId) return;
     if (error.status === 401) {
       showLogin("Sua sessão expirou. Entre novamente.");
       return;
     }
     setStatus(reportStatus, error.message, true);
   }
+}
+
+function prepareWhatsAppReport() {
+  if (!currentReport) return;
+  whatsappReport.replaceChildren();
+  whatsappReport.hidden = true;
+  if (!currentReport.whatsappRecipient) {
+    setStatus(reportStatus, "O WhatsApp da barbearia não está configurado no servidor.", true);
+    return;
+  }
+  setStatus(reportStatus, "");
+  const title = `Agendamentos ZMB Dos Cortes — ${reportMonth.value.slice(5, 7)}/${reportMonth.value.slice(0, 4)}`;
+  const lines = currentReport.appointments.map((appointment) => {
+    const status = appointment.cancelled ? "Cancelado" : "Ativo";
+    const payment = appointment.paid ? "Pago" : "Pendente";
+    const reason = appointment.cancelled && appointment.cancellationReason
+      ? `\nMotivo: ${appointment.cancellationReason}`
+      : "";
+    return `${dateLabel(appointment.date)} às ${appointment.time}\n`
+      + `Cliente: ${appointment.name}\nWhatsApp: ${appointment.phone}\n`
+      + `Serviço: ${appointment.service}\nValor: ${moneyLabel(appointment.priceCents)}\n`
+      + `Pagamento: ${appointment.paymentMethod} — ${payment}\nSituação: ${status}${reason}`;
+  });
+  const entries = lines.length ? lines : ["Nenhum agendamento neste mês."];
+  const chunks = [];
+  let chunk = "";
+  let encodedLength = 0;
+  for (const entry of entries) {
+    const separator = chunk ? "\n\n" : "";
+    if (chunk && encodedLength + encodeURIComponent(separator + entry).length > 1300) {
+      chunks.push(chunk);
+      chunk = "";
+      encodedLength = 0;
+    }
+    for (const character of (chunk ? "\n\n" : "") + entry) {
+      const length = encodeURIComponent(character).length;
+      if (encodedLength + length > 1300) {
+        chunks.push(chunk);
+        chunk = "";
+        encodedLength = 0;
+      }
+      chunk += character;
+      encodedLength += length;
+    }
+  }
+  if (chunk) chunks.push(chunk);
+
+  const note = document.createElement("p");
+  note.textContent = chunks.length > 1
+    ? `O relatório foi dividido em ${chunks.length} partes. Abra cada parte e confirme o envio no WhatsApp. Confira o destinatário antes de enviar.`
+    : "Abra o WhatsApp, confira o destinatário e confirme o envio da mensagem.";
+  whatsappReport.append(note);
+  chunks.forEach((part, index) => {
+    const link = document.createElement("a");
+    const message = `${title}${chunks.length > 1 ? ` — parte ${index + 1}/${chunks.length}` : ""}\n\n${part}`;
+    link.href = `https://wa.me/${currentReport.whatsappRecipient}?text=${encodeURIComponent(message)}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = chunks.length > 1 ? `Abrir parte ${index + 1}` : "Abrir relatório no WhatsApp";
+    whatsappReport.append(link);
+  });
+  whatsappReport.hidden = false;
 }
 
 async function updatePayment(appointment) {
@@ -273,7 +375,12 @@ reportForm.addEventListener("submit", async (event) => {
 });
 
 document.querySelector("#refresh-button").addEventListener("click", loadReport);
-document.querySelector("#export-button").addEventListener("click", downloadReport);
+reportMonth.addEventListener("input", () => {
+  clearReport();
+  setStatus(reportStatus, "Selecione Consultar para carregar o mês escolhido.");
+});
+exportButton.addEventListener("click", downloadReport);
+whatsappReportButton.addEventListener("click", prepareWhatsAppReport);
 
 closeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -326,10 +433,7 @@ async function initializeAdminPage() {
   }
 }
 
-document.querySelector("#report-to").value = localDateString(new Date());
-document.querySelector("#report-from").value = `${localDateString(new Date()).slice(0, 7)}-01`;
-document.querySelector("#report-from").max = "2030-12-31";
-document.querySelector("#report-to").max = "2030-12-31";
+reportMonth.value = localDateString(new Date()).slice(0, 7);
 document.querySelector("#close-date").value = localDateString(new Date());
 document.querySelector("#close-date").min = localDateString(new Date());
 showLogin();

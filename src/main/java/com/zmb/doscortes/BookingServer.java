@@ -668,6 +668,7 @@ public final class BookingServer {
         response.addProperty("from", from.toString());
         response.addProperty("to", to.toString());
         response.addProperty("receivedCents", receivedCents);
+        addNullableProperty(response, "whatsappRecipient", normalizedWhatsAppRecipient());
         response.add("appointments", appointments);
         response.add("closures", closures);
         sendJson(exchange, 200, response);
