@@ -584,18 +584,10 @@ public final class BookingServer {
                            is_paid, paid_at, FALSE AS is_cancelled, '' AS cancellation_reason
                     FROM appointments
                     WHERE appointment_date BETWEEN ? AND ?
-                    UNION ALL
-                    SELECT original_appointment_id, customer_name, customer_phone, service_id,
-                           payment_method, appointment_date, appointment_time, service_price_cents,
-                           is_paid, paid_at, TRUE AS is_cancelled, cancellation_reason
-                    FROM cancelled_appointments
-                    WHERE appointment_date BETWEEN ? AND ?
                     ORDER BY appointment_date, appointment_time
                     """)) {
                 queryAppointments.setString(1, from.toString());
                 queryAppointments.setString(2, to.toString());
-                queryAppointments.setString(3, from.toString());
-                queryAppointments.setString(4, to.toString());
                 try (ResultSet result = queryAppointments.executeQuery()) {
                     while (result.next()) {
                         JsonObject appointment = new JsonObject();
